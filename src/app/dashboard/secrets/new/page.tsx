@@ -35,13 +35,28 @@ export default function CreateSecretPage() {
   
   const [publicKeyRaw, setPublicKeyRaw] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadPubKey() {
+  const [publicKeyError, setPublicKeyError] = useState('');
+  const [isRetryingKey, setIsRetryingKey] = useState(false);
+
+  const loadPubKey = async () => {
+    try {
+      setIsRetryingKey(true);
+      setPublicKeyError('');
       const config = await getVaultConfig();
       if (config.isSetup && config.publicKey) {
         setPublicKeyRaw(config.publicKey);
+      } else {
+        setPublicKeyError('Public key not found in configuration.');
       }
+    } catch (err: any) {
+      console.error('Failed to load public key:', err);
+      setPublicKeyError('Secure encryption could not be initialized.');
+    } finally {
+      setIsRetryingKey(false);
     }
+  };
+
+  useEffect(() => {
     loadPubKey();
   }, []);
 
@@ -74,7 +89,7 @@ export default function CreateSecretPage() {
 
   const handleSaveSecurely = async () => {
     if (!publicKeyRaw) {
-      setError('Failed to load public key. Try refreshing.');
+      setError('Secure encryption could not be initialized. Your secret was NOT saved.');
       return;
     }
 
@@ -149,11 +164,29 @@ export default function CreateSecretPage() {
 
           {error && <div className="text-red-500 dark:text-red-400 text-sm text-center">{error}</div>}
 
+          {publicKeyError && (
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-900 rounded-md p-4 text-center space-y-3">
+              <p className="text-sm text-amber-700 dark:text-amber-400 font-medium">
+                {publicKeyError}
+              </p>
+              <Button 
+                type="button" 
+                variant="outline" 
+                size="sm" 
+                onClick={loadPubKey}
+                disabled={isRetryingKey}
+                className="border-amber-300 dark:border-amber-700 text-amber-700 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900"
+              >
+                {isRetryingKey ? 'Retrying...' : 'Retry'}
+              </Button>
+            </div>
+          )}
+
           <div className="flex gap-4 pt-4">
             <Button variant="outline" className="flex-1 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300" onClick={() => setStep('form')} disabled={loading}>
               Cancel
             </Button>
-            <Button className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white" onClick={handleSaveSecurely} disabled={loading}>
+            <Button className="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-60 disabled:cursor-not-allowed" onClick={handleSaveSecurely} disabled={loading || !publicKeyRaw}>
               {loading ? 'Securing...' : 'Save Securely'}
             </Button>
           </div>
