@@ -1,0 +1,41 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790415703934,
+      "tag": "0000_pale_weapon_omega",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1790415843425,
+      "tag": "0001_marvelous_epoch",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1790416188963,
+      "tag": "0002_left_hercules",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1790416865181,
+      "tag": "0003_lush_marvel_zombies",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1790417225862,
+      "tag": "0004_typical_network",
+      "breakpoints": true
+    }
+  ]
+}
