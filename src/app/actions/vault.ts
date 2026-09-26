@@ -46,7 +46,7 @@ export async function setupVault(
   });
 
   if (existingUser && existingUser.vaultSalt) {
-    throw new Error('Vault is already set up.');
+    throw new Error('Lockora is already set up.');
   }
 
   if (!existingUser) {
@@ -180,7 +180,7 @@ export async function changeVaultPassword(
   if (userObj?.emailAddresses[0]) {
     await emailService.sendSecurityAlert(
       userObj.emailAddresses[0].emailAddress,
-      'Your Vault Password was changed',
+      'Your Lockora Password was changed',
       new Date()
     );
   }

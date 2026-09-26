@@ -10,7 +10,7 @@ export default function ProfilePage() {
         <p className="text-zinc-400 mt-1">
           Manage your <span className="text-blue-400 font-medium">Lockora account</span> — 
           name, email, password reset, active sessions, and account deletion.
-          This is separate from your <span className="text-indigo-400 font-medium">Vault Password</span>.
+          This is separate from your <span className="text-indigo-400 font-medium">Lockora Password</span>.
         </p>
       </div>
 
