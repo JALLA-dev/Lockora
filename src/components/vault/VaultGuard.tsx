@@ -98,7 +98,7 @@ export function VaultGuard({ children }: { children: React.ReactNode }) {
         <div className="text-center space-y-1">
           <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Lockora</h2>
           <p className="text-sm font-medium tracking-widest text-zinc-500 dark:text-zinc-400 uppercase">
-            Securing your workspace...
+            Loading Lockora...
           </p>
         </div>
         

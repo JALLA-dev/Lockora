@@ -69,7 +69,7 @@ export default function UnlockVaultPage() {
           <div className="absolute h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-indigo-500 border-r-violet-500 opacity-80" />
           <Image src="/lockora-icon.png" alt="Lockora" width={48} height={48} className="rounded-xl" />
         </div>
-        <p className="text-sm font-medium tracking-widest text-zinc-400 uppercase">Securing your vault...</p>
+        <p className="text-sm font-medium tracking-widest text-zinc-400 uppercase">Loading Lockora...</p>
       </div>
     );
   }
@@ -122,7 +122,7 @@ export default function UnlockVaultPage() {
           return;
         }
 
-        throw new Error(useRecovery ? 'Invalid recovery key.' : 'Incorrect Vault Password.');
+        throw new Error(useRecovery ? 'Invalid recovery key.' : 'Incorrect Lockora Password.');
       }
 
       // 3. Import Private Key

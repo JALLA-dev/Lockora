@@ -18,6 +18,7 @@ import {
 } from '@/lib/crypto';
 import { getVaultConfig } from '@/app/actions/vault';
 import { Textarea } from '@/components/ui/textarea';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { PlusCircle, Trash2 } from 'lucide-react';
 
 export function SecretDetail({ secret }: { secret: any }) {
@@ -172,15 +173,16 @@ export function SecretDetail({ secret }: { secret: any }) {
     }
   };
 
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [deleteConfirmationPhrase, setDeleteConfirmationPhrase] = useState('');
+
   const handleDelete = async () => {
-    const phrase = prompt('Delete Secret?\n\nThis permanently deletes the secret.\nTo continue, type:\nDELETE PERMANENTLY');
-    if (phrase === 'DELETE PERMANENTLY') {
-      try {
-        await deleteSecret(secret.id, phrase);
-        router.push('/dashboard');
-      } catch (err: any) {
-        alert(err.message || 'Deletion failed');
-      }
+    if (deleteConfirmationPhrase !== 'DELETE PERMANENTLY') return;
+    try {
+      await deleteSecret(secret.id, deleteConfirmationPhrase);
+      router.push('/dashboard');
+    } catch (err: any) {
+      alert(err.message || 'Deletion failed');
     }
   };
 
@@ -488,9 +490,44 @@ export function SecretDetail({ secret }: { secret: any }) {
           >
             Edit
           </Button>
-          <Button variant="destructive" onClick={handleDelete} className="ml-auto bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-red-300 border border-red-200 dark:border-red-900/50 shadow-sm font-semibold">
-            Delete
-          </Button>
+          <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <DialogTrigger className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 h-9 px-4 py-2 ml-auto bg-red-50 dark:bg-red-950 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900 hover:text-red-700 dark:hover:text-red-300 border border-red-200 dark:border-red-900/50 shadow-sm font-semibold">
+              Delete
+            </DialogTrigger>
+            <DialogContent className="sm:max-w-md mx-4 sm:mx-auto rounded-xl">
+              <DialogHeader>
+                <DialogTitle>Delete Secret</DialogTitle>
+                <DialogDescription>
+                  This action cannot be undone. This will permanently delete the secret and remove it from our servers.
+                </DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 py-4">
+                <p className="text-sm text-zinc-500 font-medium">
+                  To confirm, type <span className="font-bold text-zinc-900 dark:text-white select-all">DELETE PERMANENTLY</span> below:
+                </p>
+                <Input
+                  value={deleteConfirmationPhrase}
+                  onChange={(e) => setDeleteConfirmationPhrase(e.target.value)}
+                  placeholder="DELETE PERMANENTLY"
+                  className="font-mono text-center border-red-200 dark:border-red-900 focus-visible:ring-red-500"
+                />
+              </div>
+              <DialogFooter className="sm:justify-between flex-col sm:flex-row gap-2">
+                <Button type="button" variant="outline" onClick={() => setIsDeleteDialogOpen(false)} className="w-full sm:w-auto">
+                  Cancel
+                </Button>
+                <Button 
+                  type="button" 
+                  variant="destructive" 
+                  onClick={handleDelete}
+                  disabled={deleteConfirmationPhrase !== 'DELETE PERMANENTLY'}
+                  className="w-full sm:w-auto"
+                >
+                  Delete Secret
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
     </div>

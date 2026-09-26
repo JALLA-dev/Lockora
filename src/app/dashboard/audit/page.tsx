@@ -57,8 +57,8 @@ export default async function AuditPage() {
                     )}
                   </div>
                   <div className="text-right text-xs text-zinc-500 dark:text-zinc-400">
-                    <div>{new Date(log.timestamp).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
-                    <div>{new Date(log.timestamp).toLocaleTimeString()}</div>
+                    <div>{new Date(log.timestamp).toISOString().split('T')[0]}</div>
+                    <div>{new Date(log.timestamp).toISOString().split('T')[1].substring(0, 8)} UTC</div>
                   </div>
                 </div>
               ))}

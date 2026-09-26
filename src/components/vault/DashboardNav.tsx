@@ -6,7 +6,9 @@ import { usePathname, useRouter } from 'next/navigation';
 import { UserButton } from '@clerk/nextjs';
 import { useVault } from '@/components/vault/VaultProvider';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import { Shield, PlusCircle, Settings, FileText, Lock } from 'lucide-react';
+import { useState } from 'react';
+import { Shield, PlusCircle, Settings, FileText, Lock, Menu } from 'lucide-react';
+import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const navItems = [
   { href: '/dashboard', label: 'My Lockora', icon: Shield },
@@ -54,6 +56,8 @@ export function DashboardSidebar() {
 
 export function DashboardHeader() {
   const { isUnlocked } = useVault();
+  const pathname = usePathname();
+  const [open, setOpen] = useState(false);
 
   return (
     <header className="h-16 border-b border-zinc-200 dark:border-zinc-800 bg-white/90 dark:bg-zinc-950/90 backdrop-blur-md flex items-center px-4 justify-between flex-shrink-0 relative z-20">
@@ -67,9 +71,9 @@ export function DashboardHeader() {
       <div className="hidden md:block flex-1" />
 
       {/* Right controls */}
-      <div className="flex items-center gap-4">
+      <div className="flex items-center gap-2 sm:gap-4">
         {/* Vault state pill */}
-        <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold border shadow-sm ${
+        <div className={`hidden sm:flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold border shadow-sm ${
           isUnlocked
             ? 'bg-emerald-50 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700/40'
             : 'bg-zinc-100 dark:bg-zinc-800/60 text-zinc-600 dark:text-zinc-300 border-zinc-200 dark:border-zinc-700/60'
@@ -82,7 +86,7 @@ export function DashboardHeader() {
         <ThemeToggle />
 
         {/* Profile */}
-        <div className="flex items-center gap-2 pl-2 border-l border-zinc-200 dark:border-zinc-800">
+        <div className="flex items-center gap-2 sm:pl-2 sm:border-l border-zinc-200 dark:border-zinc-800">
           <UserButton 
             appearance={{
               elements: {
@@ -90,6 +94,42 @@ export function DashboardHeader() {
               }
             }} 
           />
+        </div>
+
+        {/* Mobile Menu */}
+        <div className="md:hidden flex items-center ml-1">
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger className="p-2 -mr-2 text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-md">
+              <Menu className="w-6 h-6" />
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0 bg-white dark:bg-zinc-950 border-r border-zinc-200 dark:border-zinc-800">
+              <div className="p-4 border-b border-zinc-200 dark:border-zinc-800 flex items-center gap-3">
+                <Image src="/lockora-icon.svg" alt="Lockora" width={32} height={32} className="rounded-lg" />
+                <span className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Lockora</span>
+              </div>
+              <nav className="flex-1 p-3 flex flex-col gap-1 overflow-y-auto">
+                {navItems.map(item => {
+                  const active = pathname === item.href;
+                  const Icon = item.icon;
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={`flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
+                        active
+                          ? 'bg-indigo-600/10 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400'
+                          : 'text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white hover:bg-zinc-100 dark:hover:bg-zinc-800/50'
+                      }`}
+                    >
+                      <Icon className="w-4 h-4" />
+                      {item.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+            </SheetContent>
+          </Sheet>
         </div>
       </div>
     </header>
