@@ -41,7 +41,7 @@ export default function SetupVaultPage() {
     setError('');
 
     if (password.length < 12) {
-      setError('Vault Password must be at least 12 characters long.');
+      setError('Lockora Password must be at least 12 characters long.');
       return;
     }
 
@@ -110,14 +110,14 @@ export default function SetupVaultPage() {
       <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
         <Card className="w-full max-w-md shadow-lg border-zinc-200 dark:border-zinc-800">
           <CardHeader>
-            <CardTitle>Vault Recovery Key</CardTitle>
+            <CardTitle>Lockora Recovery Key</CardTitle>
             <CardDescription className="text-amber-600 dark:text-amber-400 font-semibold">
               Important: Copy this recovery key. It will only be shown once.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
             <p className="text-sm text-zinc-500">
-              If you forget your Vault Password, you can use this key to decrypt your vault. If you lose both your Vault Password and this key, your data cannot be recovered.
+              If you forget your Lockora Password, you can use this key to decrypt your data. If you lose both your Lockora Password and this key, your data cannot be recovered.
             </p>
             <div className="p-4 bg-zinc-100 dark:bg-zinc-900 rounded font-mono text-center text-lg tracking-wider break-all border border-zinc-200 dark:border-zinc-800 select-all">
               {recoveryCode}
@@ -137,9 +137,9 @@ export default function SetupVaultPage() {
     <div className="flex h-screen items-center justify-center bg-zinc-50 dark:bg-zinc-950 p-4">
       <Card className="w-full max-w-md shadow-lg border-zinc-200 dark:border-zinc-800">
         <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold tracking-tight">Set up your Vault</CardTitle>
+          <CardTitle className="text-2xl font-bold tracking-tight">Set up Lockora Security</CardTitle>
           <CardDescription>
-            Create a strong Vault Password. This is separate from your account password.
+            Create a strong Lockora Password. This is separate from your account password.
             <br/><br/>
             <strong className="text-red-500 dark:text-red-400">WARNING:</strong> If you lose this password, your secrets cannot be recovered.
           </CardDescription>
@@ -147,7 +147,7 @@ export default function SetupVaultPage() {
         <form onSubmit={handleSetup}>
           <CardContent className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="password">Vault Password</Label>
+              <Label htmlFor="password">Lockora Password</Label>
               <Input 
                 id="password" 
                 type="password" 
@@ -186,7 +186,7 @@ export default function SetupVaultPage() {
           </CardContent>
           <CardFooter>
             <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'Setting up Vault...' : 'Initialize Vault'}
+              {loading ? 'Securing Data...' : 'Initialize Lockora'}
             </Button>
           </CardFooter>
         </form>

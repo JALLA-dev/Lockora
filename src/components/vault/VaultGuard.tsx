@@ -41,7 +41,7 @@ export function VaultGuard({ children }: { children: React.ReactNode }) {
       inFlightRef.current = false;
 
       if (!config.isSetup) {
-        setState('ready');
+        router.push('/setup');
         return;
       }
 
