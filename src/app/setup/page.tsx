@@ -38,8 +38,8 @@ type PageStep = 'checking' | 'taking_long' | 'form' | 'otp' | 'recovery' | 'comp
 function calculatePasswordStrength(pwd: string): { score: number; label: string; color: string; widthClass: string } {
   if (!pwd) return { score: 0, label: '', color: 'bg-zinc-700', widthClass: 'w-0' };
   let score = 0;
+  if (pwd.length >= 8) score += 1;
   if (pwd.length >= 12) score += 1;
-  if (pwd.length >= 16) score += 1;
   if (/[A-Z]/.test(pwd) && /[a-z]/.test(pwd)) score += 1;
   if (/[0-9]/.test(pwd)) score += 1;
   if (/[^A-Za-z0-9]/.test(pwd)) score += 1;
@@ -171,8 +171,8 @@ export default function SetupVaultPage() {
     e.preventDefault();
     setErrorMessage('');
 
-    if (password.length < 12) {
-      setErrorMessage('Lockora Password must be at least 12 characters long.');
+    if (password.length < 8) {
+      setErrorMessage('Lockora Password must be at least 8 characters long.');
       return;
     }
 
@@ -227,24 +227,15 @@ export default function SetupVaultPage() {
     try {
       setSubmitting(true);
 
-      // 1. Generate random salt (16 bytes)
       const saltBuffer = crypto.getRandomValues(new Uint8Array(16));
       const salt = bufferToBase64(saltBuffer.buffer);
 
-      // 2. Derive Master Key from Lockora Password
       const mk = await deriveMasterKey(password, salt);
-
-      // 3. Generate Asymmetric Key Pair
       const keyPair = await generateKeyPair();
-
-      // 4. Export Public Key (SPKI)
       const publicKeyRaw = await exportKey(keyPair.publicKey, 'spki');
-
-      // 5. Encrypt Private Key with Master Key
       const privateKeyJwk = await exportKey(keyPair.privateKey, 'jwk');
       const encryptedPrivateKey = await encryptSymmetric(mk, privateKeyJwk);
 
-      // 6. Optional: Backup Recovery Key
       let encryptedPrivateKeyRecovery;
       let generatedRecoveryKey = '';
       if (generateRecoveryKey) {
@@ -258,7 +249,6 @@ export default function SetupVaultPage() {
         encryptedPrivateKeyRecovery = await encryptSymmetric(recoveryMk, privateKeyJwk);
       }
 
-      // 7. Save to Server with OTP verification
       await setupVault(
         otpCode.trim(),
         salt,
@@ -267,10 +257,8 @@ export default function SetupVaultPage() {
         encryptedPrivateKeyRecovery
       );
 
-      // 8. Unlock in-memory state
       unlockVault(mk, keyPair.privateKey);
 
-      // 9. Show recovery code or completion screen
       if (generatedRecoveryKey) {
         setRecoveryCode(generatedRecoveryKey);
         setStep('recovery');
@@ -304,7 +292,6 @@ export default function SetupVaultPage() {
 
   const strength = calculatePasswordStrength(password);
 
-  // 1. LOADING STATE (Within 10 seconds)
   if (step === 'checking') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
@@ -326,7 +313,6 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 2. TAKING LONGER THAN 10 SECONDS STATE
   if (step === 'taking_long') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
@@ -365,7 +351,6 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 3. ERROR STATE
   if (step === 'error') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
@@ -401,7 +386,6 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 4. OTP VERIFICATION STATE
   if (step === 'otp') {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 relative z-10">
@@ -489,7 +473,6 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 5. RECOVERY KEY DISPLAY STATE
   if (step === 'recovery') {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 relative z-10">
@@ -551,7 +534,6 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 6. SUCCESS / COMPLETE STATE
   if (step === 'complete') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
@@ -575,7 +557,6 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 7. FORM STATE (DEFAULT / CREATION UI)
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 relative z-10">
       <Card className="w-full max-w-md shadow-2xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/90 backdrop-blur">
@@ -610,11 +591,10 @@ export default function SetupVaultPage() {
               <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
               <div>
                 <strong className="font-semibold block mb-0.5">Keep this password safe:</strong>
-                This is separate from your account login. If lost without a recovery key, your data cannot be recovered.
+                This password protects your Lockora secrets and is separate from your Clerk account password.
               </div>
             </div>
 
-            {/* Lockora Password */}
             <div className="space-y-1.5">
               <Label htmlFor="password" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Lockora Password
@@ -623,11 +603,11 @@ export default function SetupVaultPage() {
                 <Input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
-                  placeholder="Enter at least 12 characters"
+                  placeholder="Minimum 8 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   required
-                  minLength={12}
+                  minLength={8}
                   className="font-mono pr-10 bg-white dark:bg-zinc-950 border-zinc-300 dark:border-zinc-800 focus:border-indigo-500"
                 />
                 <button
@@ -640,7 +620,6 @@ export default function SetupVaultPage() {
                 </button>
               </div>
 
-              {/* Password Strength Indicator */}
               {password.length > 0 && (
                 <div className="space-y-1 pt-1">
                   <div className="flex justify-between items-center text-xs">
@@ -654,7 +633,6 @@ export default function SetupVaultPage() {
               )}
             </div>
 
-            {/* Confirm Password */}
             <div className="space-y-1.5">
               <Label htmlFor="confirmPassword" className="text-xs font-semibold text-zinc-700 dark:text-zinc-300">
                 Confirm Lockora Password
@@ -694,7 +672,6 @@ export default function SetupVaultPage() {
               )}
             </div>
 
-            {/* Recovery Key Checkbox */}
             <div className="flex items-center space-x-2.5 pt-2">
               <input
                 type="checkbox"
@@ -718,7 +695,7 @@ export default function SetupVaultPage() {
           <CardFooter className="flex flex-col gap-2 pt-2">
             <Button
               type="submit"
-              disabled={submitting || password.length < 12 || password !== confirmPassword}
+              disabled={submitting || password.length < 8 || password !== confirmPassword}
               className="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-semibold shadow-md py-2.5"
             >
               {submitting ? (
