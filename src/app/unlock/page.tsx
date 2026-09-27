@@ -64,7 +64,7 @@ export default function UnlockVaultPage() {
 
   if (!isLoaded || checking) {
     return (
-      <div className="flex h-screen flex-col items-center justify-center gap-6 bg-zinc-950">
+      <div className="flex h-screen flex-col items-center justify-center gap-6 bg-zinc-950 relative z-10">
         <div className="relative flex items-center justify-center">
           <div className="absolute h-20 w-20 animate-spin rounded-full border-4 border-transparent border-t-indigo-500 border-r-violet-500 opacity-80" />
           <Image src="/lockora-icon.png" alt="Lockora" width={48} height={48} className="rounded-xl" />
@@ -149,7 +149,7 @@ export default function UnlockVaultPage() {
   };
 
   return (
-    <div className="flex h-screen items-center justify-center bg-zinc-950 p-4">
+    <div className="flex h-screen items-center justify-center bg-zinc-950 p-4 relative z-10">
       <div className="w-full max-w-md space-y-6">
         {/* Header with logo */}
         <div className="flex flex-col items-center gap-3">

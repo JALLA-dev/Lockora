@@ -277,7 +277,7 @@ export default function SetupVaultPage() {
   // 1. LOADING STATE
   if (step === 'checking') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
         <div className="relative flex items-center justify-center mb-6">
           <div className="absolute h-24 w-24 animate-spin rounded-full border-2 border-transparent border-t-indigo-500 border-b-violet-500 opacity-60" />
           <Image src="/lockora-icon.png" alt="Lockora" width={56} height={56} className="rounded-2xl relative z-10 shadow-xl" />
@@ -291,7 +291,7 @@ export default function SetupVaultPage() {
   // 2. ERROR STATE
   if (step === 'error') {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100">
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
         <Card className="w-full max-w-md shadow-2xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/90 backdrop-blur">
           <CardHeader className="text-center space-y-2">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400">

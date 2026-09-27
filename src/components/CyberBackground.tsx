@@ -17,7 +17,7 @@ export function CyberBackground() {
 
   if (!mounted) {
     // Static background fallback
-    return <div className="fixed inset-0 z-0 bg-white dark:bg-zinc-950 cyber-bg-pattern pointer-events-none" />;
+    return <div className="fixed inset-0 -z-10 bg-white dark:bg-zinc-950 cyber-bg-pattern pointer-events-none" />;
   }
 
   // Generate deterministic floating items
@@ -34,7 +34,7 @@ export function CyberBackground() {
   ];
 
   return (
-    <div className="fixed inset-0 z-0 pointer-events-none overflow-hidden">
+    <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden">
       {/* Base patterned background */}
       <div className="absolute inset-0 bg-white dark:bg-zinc-950 cyber-bg-pattern opacity-100" />
       
