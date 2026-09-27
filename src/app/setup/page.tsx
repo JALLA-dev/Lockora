@@ -18,22 +18,22 @@ import { Label } from '@/components/ui/label';
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from '@/components/ui/card';
 import Image from 'next/image';
 import { 
-  Shield, 
   Eye, 
   EyeOff, 
   CheckCircle2, 
   AlertTriangle, 
   RefreshCw, 
-  Lock, 
   ArrowLeft, 
   Copy, 
   Check,
   Mail,
   KeyRound,
-  ShieldCheck
+  ShieldCheck,
+  ShieldAlert,
+  Clock
 } from 'lucide-react';
 
-type PageStep = 'checking' | 'form' | 'otp' | 'recovery' | 'complete' | 'error';
+type PageStep = 'checking' | 'taking_long' | 'form' | 'otp' | 'recovery' | 'complete' | 'error';
 
 function calculatePasswordStrength(pwd: string): { score: number; label: string; color: string; widthClass: string } {
   if (!pwd) return { score: 0, label: '', color: 'bg-zinc-700', widthClass: 'w-0' };
@@ -74,6 +74,7 @@ export default function SetupVaultPage() {
   const [copied, setCopied] = useState(false);
 
   const inFlightRef = useRef(false);
+  const globalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const checkSetupStatus = useCallback(async () => {
     if (inFlightRef.current) return;
@@ -81,18 +82,13 @@ export default function SetupVaultPage() {
     setStep('checking');
     setErrorMessage('');
 
-    const timeoutId = setTimeout(() => {
-      if (inFlightRef.current) {
-        inFlightRef.current = false;
-        setStep('error');
-        setErrorMessage('The setup check timed out. Please verify your connection and try again.');
-      }
-    }, 15000);
-
     try {
       const config = await getVaultConfig();
-      clearTimeout(timeoutId);
       inFlightRef.current = false;
+
+      if (globalTimeoutRef.current) {
+        clearTimeout(globalTimeoutRef.current);
+      }
 
       if (config.isSetup) {
         // Setup is already complete! Redirect safely to dashboard.
@@ -102,17 +98,35 @@ export default function SetupVaultPage() {
 
       setStep('form');
     } catch (err: any) {
-      clearTimeout(timeoutId);
       inFlightRef.current = false;
-      console.error('[LockoraSetup] Status check error:', err?.message);
+      if (globalTimeoutRef.current) {
+        clearTimeout(globalTimeoutRef.current);
+      }
+      console.error('[LockoraSetup] Status check error:', err?.message ?? 'Unknown error');
       setStep('error');
       if (err?.message?.includes('Unauthorized')) {
         setErrorMessage('Your login session has expired. Please sign in again.');
       } else {
-        setErrorMessage(err?.message || 'Unable to load Lockora setup status. Please try again.');
+        setErrorMessage('Something prevented Lockora from preparing your security setup.');
       }
     }
   }, [router]);
+
+  // Global 10-second timeout mechanism
+  useEffect(() => {
+    globalTimeoutRef.current = setTimeout(() => {
+      if (step === 'checking') {
+        console.warn('[LockoraSetup] Setup loading exceeded 10-second threshold.');
+        setStep('taking_long');
+      }
+    }, 10_000);
+
+    return () => {
+      if (globalTimeoutRef.current) {
+        clearTimeout(globalTimeoutRef.current);
+      }
+    };
+  }, [step]);
 
   useEffect(() => {
     if (isLoaded) {
@@ -123,6 +137,22 @@ export default function SetupVaultPage() {
       }
     }
   }, [isLoaded, userId, checkSetupStatus, router]);
+
+  const handleRetry = async () => {
+    setIsRetrying(true);
+    inFlightRef.current = false;
+
+    // Reset timer
+    if (globalTimeoutRef.current) clearTimeout(globalTimeoutRef.current);
+    globalTimeoutRef.current = setTimeout(() => {
+      if (step === 'checking') {
+        setStep('taking_long');
+      }
+    }, 10_000);
+
+    await checkSetupStatus();
+    setIsRetrying(false);
+  };
 
   const startResendTimer = () => {
     setResendCooldown(30);
@@ -161,7 +191,7 @@ export default function SetupVaultPage() {
         startResendTimer();
       }
     } catch (err: any) {
-      console.error('[LockoraSetup] OTP trigger error:', err);
+      console.error('[LockoraSetup] OTP trigger error:', err?.message);
       setErrorMessage(err.message || 'Failed to send verification code to your email.');
     } finally {
       setSubmitting(false);
@@ -251,7 +281,7 @@ export default function SetupVaultPage() {
         }, 1500);
       }
     } catch (err: any) {
-      console.error('[LockoraSetup] Setup submission error:', err);
+      console.error('[LockoraSetup] Setup submission error:', err?.message);
       setErrorMessage(err.message || 'Setup failed. Please check your verification code and try again.');
     } finally {
       setSubmitting(false);
@@ -274,41 +304,48 @@ export default function SetupVaultPage() {
 
   const strength = calculatePasswordStrength(password);
 
-  // 1. LOADING STATE
+  // 1. LOADING STATE (Within 10 seconds)
   if (step === 'checking') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
         <div className="relative flex items-center justify-center mb-6">
           <div className="absolute h-24 w-24 animate-spin rounded-full border-2 border-transparent border-t-indigo-500 border-b-violet-500 opacity-60" />
-          <Image src="/lockora-icon.png" alt="Lockora" width={56} height={56} className="rounded-2xl relative z-10 shadow-xl" />
+          <Image
+            src="/lockora-icon.png"
+            alt="Lockora"
+            width={56}
+            height={56}
+            priority
+            unoptimized
+            className="rounded-2xl relative z-10 shadow-xl"
+          />
         </div>
-        <h2 className="text-xl font-bold tracking-tight text-zinc-900 dark:text-white">Preparing Lockora...</h2>
-        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Securing your vault setup...</p>
+        <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Lockora</h1>
+        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Preparing your secure setup...</p>
       </div>
     );
   }
 
-  // 2. ERROR STATE
-  if (step === 'error') {
+  // 2. TAKING LONGER THAN 10 SECONDS STATE
+  if (step === 'taking_long') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
         <Card className="w-full max-w-md shadow-2xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/90 backdrop-blur">
           <CardHeader className="text-center space-y-2">
-            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400">
-              <AlertTriangle className="h-7 w-7" />
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-100 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800/50 text-amber-600 dark:text-amber-400">
+              <Clock className="h-7 w-7" />
             </div>
-            <CardTitle className="text-xl font-bold">Unable to load Lockora setup</CardTitle>
-            <CardDescription className="text-sm text-zinc-500 dark:text-zinc-400">
-              {errorMessage || 'An unexpected error occurred while preparing your setup.'}
+            <CardTitle className="text-xl font-bold text-zinc-900 dark:text-white">Lockora</CardTitle>
+            <CardDescription className="text-sm text-amber-600 dark:text-amber-400 font-medium">
+              Lockora is taking longer than expected.
             </CardDescription>
           </CardHeader>
+          <CardContent className="text-center text-xs text-zinc-500 dark:text-zinc-400">
+            Please check your network connection or try retrying the security setup initialization.
+          </CardContent>
           <CardFooter className="flex flex-col sm:flex-row gap-3 pt-2">
             <Button 
-              onClick={async () => {
-                setIsRetrying(true);
-                await checkSetupStatus();
-                setIsRetrying(false);
-              }}
+              onClick={handleRetry}
               disabled={isRetrying}
               className="w-full sm:flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
             >
@@ -328,7 +365,43 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 3. OTP VERIFICATION STATE
+  // 3. ERROR STATE
+  if (step === 'error') {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
+        <Card className="w-full max-w-md shadow-2xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/90 backdrop-blur">
+          <CardHeader className="text-center space-y-2">
+            <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-red-100 dark:bg-red-950/60 border border-red-200 dark:border-red-800/50 text-red-600 dark:text-red-400">
+              <ShieldAlert className="h-7 w-7" />
+            </div>
+            <CardTitle className="text-xl font-bold text-zinc-900 dark:text-white">Unable to load secure setup</CardTitle>
+            <CardDescription className="text-sm text-zinc-500 dark:text-zinc-400">
+              {errorMessage || 'Something prevented Lockora from preparing your security setup.'}
+            </CardDescription>
+          </CardHeader>
+          <CardFooter className="flex flex-col sm:flex-row gap-3 pt-2">
+            <Button 
+              onClick={handleRetry}
+              disabled={isRetrying}
+              className="w-full sm:flex-1 bg-indigo-600 hover:bg-indigo-500 text-white font-medium"
+            >
+              <RefreshCw className={`mr-2 h-4 w-4 ${isRetrying ? 'animate-spin' : ''}`} />
+              {isRetrying ? 'Retrying...' : 'Retry'}
+            </Button>
+            <Button 
+              variant="outline"
+              onClick={() => router.push('/dashboard')}
+              className="w-full sm:flex-1 border-zinc-300 dark:border-zinc-700 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800"
+            >
+              Back to Dashboard
+            </Button>
+          </CardFooter>
+        </Card>
+      </div>
+    );
+  }
+
+  // 4. OTP VERIFICATION STATE
   if (step === 'otp') {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 relative z-10">
@@ -416,7 +489,7 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 4. RECOVERY KEY DISPLAY STATE
+  // 5. RECOVERY KEY DISPLAY STATE
   if (step === 'recovery') {
     return (
       <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 relative z-10">
@@ -478,7 +551,7 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 5. SUCCESS / COMPLETE STATE
+  // 6. SUCCESS / COMPLETE STATE
   if (step === 'complete') {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 text-zinc-900 dark:text-zinc-100 relative z-10">
@@ -502,13 +575,21 @@ export default function SetupVaultPage() {
     );
   }
 
-  // 6. FORM STATE (DEFAULT)
+  // 7. FORM STATE (DEFAULT / CREATION UI)
   return (
     <div className="flex min-h-screen items-center justify-center p-4 bg-zinc-50 dark:bg-zinc-950 relative z-10">
       <Card className="w-full max-w-md shadow-2xl border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/90 backdrop-blur">
         <CardHeader className="space-y-3 pb-4">
           <div className="flex items-center gap-3">
-            <Image src="/lockora-icon.png" alt="Lockora Logo" width={40} height={40} className="rounded-xl shadow-md" />
+            <Image
+              src="/lockora-icon.png"
+              alt="Lockora Logo"
+              width={40}
+              height={40}
+              priority
+              unoptimized
+              className="rounded-xl shadow-md"
+            />
             <div>
               <CardTitle className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">
                 Secure Your Lockora
@@ -519,7 +600,7 @@ export default function SetupVaultPage() {
             </div>
           </div>
           <CardDescription className="text-sm text-zinc-600 dark:text-zinc-400">
-            Set up your Lockora Password to protect access to your stored secrets.
+            Create your Lockora Password to protect access to your stored secrets.
           </CardDescription>
         </CardHeader>
 
