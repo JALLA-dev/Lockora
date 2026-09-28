@@ -24,6 +24,20 @@ export interface EmailProvider {
   sendEmail(options: EmailOptions): Promise<SendEmailResult>;
 }
 
+/**
+ * Safely mask email for development logging (e.g., "jo***@example.com").
+ */
+export function maskEmail(email: string): string {
+  if (!email || typeof email !== 'string' || !email.includes('@')) {
+    return '***@***.com';
+  }
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) {
+    return `${local[0]}***@${domain}`;
+  }
+  return `${local.substring(0, 2)}***@${domain}`;
+}
+
 export class ResendEmailProvider implements EmailProvider {
   private resend: Resend;
   private fromEmail: string;
@@ -44,7 +58,10 @@ export class ResendEmailProvider implements EmailProvider {
       });
 
       if (response.error) {
-        return { success: false, error: response.error.message };
+        return {
+          success: false,
+          error: `Resend API Error [${response.error.name || 'API_ERROR'}]: ${response.error.message}`,
+        };
       }
 
       return { success: true, id: response.data?.id };
@@ -67,7 +84,7 @@ export class MockEmailProvider implements EmailProvider {
       return { success: false, error: this.failMessage };
     }
     this.sentEmails.push(options);
-    console.log(`[Mock Email Sent] Subject: "${options.subject}" -> To: ${options.to}`);
+    console.log(`[Mock Email Delivery] Subject: "${options.subject}" -> To: ${maskEmail(options.to)}`);
     return { success: true, id: `mock-${Date.now()}` };
   }
 }
@@ -83,26 +100,33 @@ export interface SecurityAlertParams {
 }
 
 export class EmailService {
-  private provider: EmailProvider;
+  private customProvider?: EmailProvider;
   private dedupCache: Map<string, number> = new Map();
   private dedupTtlMs: number = 60 * 1000; // 60-second window
 
   constructor(provider?: EmailProvider) {
     if (provider) {
-      this.provider = provider;
-    } else if (process.env.RESEND_API_KEY) {
-      this.provider = new ResendEmailProvider(process.env.RESEND_API_KEY);
-    } else {
-      this.provider = new MockEmailProvider();
+      this.customProvider = provider;
     }
   }
 
   public setProvider(provider: EmailProvider) {
-    this.provider = provider;
+    this.customProvider = provider;
   }
 
+  /**
+   * Dynamically resolves the active EmailProvider.
+   * Checks process.env.RESEND_API_KEY dynamically on every request.
+   */
   public getProvider(): EmailProvider {
-    return this.provider;
+    if (this.customProvider) {
+      return this.customProvider;
+    }
+    const apiKey = process.env.RESEND_API_KEY;
+    if (apiKey && apiKey.trim().length > 0) {
+      return new ResendEmailProvider(apiKey.trim());
+    }
+    return new MockEmailProvider();
   }
 
   public clearDeduplicationCache() {
@@ -120,7 +144,6 @@ export class EmailService {
 
   private recordSent(key: string) {
     this.dedupCache.set(key, Date.now());
-    // Prune stale cache entries
     const now = Date.now();
     for (const [k, v] of this.dedupCache.entries()) {
       if (now - v > this.dedupTtlMs) {
@@ -130,14 +153,17 @@ export class EmailService {
   }
 
   /**
-   * Reusable function to send security alerts to users.
-   * Safe error handling ensures email failures never crash caller or reveal sensitive material.
+   * Main entry point for sending security alerts.
+   * Includes safe server-side diagnostic logging (Requirement 7 & 8).
    */
   public async sendSecurityAlert(params: SecurityAlertParams): Promise<SendEmailResult> {
     try {
       if (!params.to || !isValidEmail(params.to)) {
+        console.warn(`[Lockora Email System] Skipped email delivery: Invalid recipient email "${params.to}"`);
         return { success: false, error: 'Invalid or missing recipient email address.' };
       }
+
+      const maskedRecipient = maskEmail(params.to);
 
       // Check for sensitive plaintext leakage in parameters
       if (
@@ -145,7 +171,7 @@ export class EmailService {
         containsSensitiveData(params.details || '') ||
         containsSensitiveData(params.actionName || '')
       ) {
-        console.error('[EmailService] Blocked email send attempt due to detected sensitive plaintext parameter.');
+        console.error('[Lockora Email System] BLOCKED send attempt due to detected sensitive plaintext parameter.');
         return {
           success: false,
           error: 'Email blocked: sensitive data pattern detected in email input.',
@@ -158,8 +184,16 @@ export class EmailService {
         `${params.to.toLowerCase()}:${params.event}:${params.serviceName || ''}:${params.actionName || ''}`;
 
       if (this.isDuplicate(dedupKey)) {
+        console.log(`[Lockora Email System] Deduplicated duplicate alert for ${params.event} to ${maskedRecipient}`);
         return { success: true, deduplicated: true };
       }
+
+      const activeProvider = this.getProvider();
+
+      console.log(`[Lockora Email System] --------------------------------------------------`);
+      console.log(`[Lockora Email System] Security Event Triggered: ${params.event}`);
+      console.log(`[Lockora Email System] Attempting delivery to recipient: ${maskedRecipient}`);
+      console.log(`[Lockora Email System] Active Email Provider: ${activeProvider.constructor.name}`);
 
       const content = formatSecurityEmailContent({
         event: params.event,
@@ -169,7 +203,7 @@ export class EmailService {
         details: params.details,
       });
 
-      const result = await this.provider.sendEmail({
+      const result = await activeProvider.sendEmail({
         to: params.to.trim(),
         subject: content.subject,
         html: content.html,
@@ -177,15 +211,19 @@ export class EmailService {
       });
 
       if (result.success) {
+        console.log(`[Lockora Email System] SUCCESS - Email delivered successfully! Resend Response ID: ${result.id || 'N/A'}`);
+        console.log(`[Lockora Email System] --------------------------------------------------`);
         this.recordSent(dedupKey);
       } else {
-        console.error(`[EmailService] Non-blocking alert send failure for event ${params.event}:`, result.error);
+        console.error(`[Lockora Email System] ERROR - Email delivery failed for event ${params.event}`);
+        console.error(`[Lockora Email System] Error Details: ${result.error}`);
+        console.log(`[Lockora Email System] --------------------------------------------------`);
       }
 
       return result;
     } catch (err: any) {
       console.error(
-        `[EmailService] Non-blocking exception sending security alert for ${params.event}:`,
+        `[Lockora Email System] Exception sending security alert for ${params.event}:`,
         err?.message || 'Unknown error'
       );
       return {

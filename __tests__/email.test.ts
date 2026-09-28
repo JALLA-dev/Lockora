@@ -185,7 +185,7 @@ describe('Lockora Email Alert System', () => {
       const actionResult = await sendTestSecurityEmailAction('SECRET_REVEALED');
 
       expect(actionResult.success).toBe(true);
-      expect(actionResult.recipientEmail).toBe('user@example.com');
+      expect(actionResult.recipientEmail).toBe('us***@example.com');
       expect((actionResult as any).RESEND_API_KEY).toBeUndefined();
       expect((actionResult as any).apiKey).toBeUndefined();
       expect(JSON.stringify(actionResult)).not.toContain('re_');
