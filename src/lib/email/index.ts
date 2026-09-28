@@ -94,6 +94,7 @@ export interface SecurityAlertParams {
   event: LockoraSecurityEventType;
   serviceName?: string;
   actionName?: string;
+  userName?: string;
   time?: Date;
   details?: string;
   idempotencyKey?: string;
@@ -154,9 +155,12 @@ export class EmailService {
 
   /**
    * Main entry point for sending security alerts.
-   * Includes safe server-side diagnostic logging (Requirement 7 & 8).
+   * Includes high-precision latency tracking & safe server-side diagnostic logging (Requirement 13).
    */
   public async sendSecurityAlert(params: SecurityAlertParams): Promise<SendEmailResult> {
+    const triggerTimestamp = new Date();
+    const tStart = performance.now();
+
     try {
       if (!params.to || !isValidEmail(params.to)) {
         console.warn(`[Lockora Email System] Skipped email delivery: Invalid recipient email "${params.to}"`);
@@ -190,32 +194,41 @@ export class EmailService {
 
       const activeProvider = this.getProvider();
 
-      console.log(`[Lockora Email System] --------------------------------------------------`);
-      console.log(`[Lockora Email System] Security Event Triggered: ${params.event}`);
-      console.log(`[Lockora Email System] Attempting delivery to recipient: ${maskedRecipient}`);
-      console.log(`[Lockora Email System] Active Email Provider: ${activeProvider.constructor.name}`);
-
       const content = formatSecurityEmailContent({
         event: params.event,
         serviceName: params.serviceName,
         actionName: params.actionName,
-        time: params.time || new Date(),
+        userName: params.userName,
+        time: params.time || triggerTimestamp,
         details: params.details,
       });
 
+      const reqStart = performance.now();
       const result = await activeProvider.sendEmail({
         to: params.to.trim(),
         subject: content.subject,
         html: content.html,
         text: content.text,
       });
+      const reqEnd = performance.now();
+      const resendDurationMs = Math.round(reqEnd - reqStart);
+      const totalDurationMs = Math.round(reqEnd - tStart);
+
+      console.log(`[Lockora Email System] --------------------------------------------------`);
+      console.log(`[Lockora Email System] Security Event: ${params.event}`);
+      console.log(`[Lockora Email System] Target Recipient: ${maskedRecipient}`);
+      console.log(`[Lockora Email System] Active Provider: ${activeProvider.constructor.name}`);
+      console.log(`[Lockora Email System] Security Event Created Time: ${(params.time || triggerTimestamp).toISOString()}`);
+      console.log(`[Lockora Email System] Alert Triggered Time: ${triggerTimestamp.toISOString()}`);
+      console.log(`[Lockora Email System] Resend HTTP Round-trip: ${resendDurationMs}ms`);
+      console.log(`[Lockora Email System] Total Function Execution Time: ${totalDurationMs}ms`);
 
       if (result.success) {
-        console.log(`[Lockora Email System] SUCCESS - Email delivered successfully! Resend Response ID: ${result.id || 'N/A'}`);
+        console.log(`[Lockora Email System] SUCCESS - Delivered to Resend! Message ID: ${result.id || 'N/A'}`);
         console.log(`[Lockora Email System] --------------------------------------------------`);
         this.recordSent(dedupKey);
       } else {
-        console.error(`[Lockora Email System] ERROR - Email delivery failed for event ${params.event}`);
+        console.error(`[Lockora Email System] ERROR - Resend HTTP delivery failed (${resendDurationMs}ms)`);
         console.error(`[Lockora Email System] Error Details: ${result.error}`);
         console.log(`[Lockora Email System] --------------------------------------------------`);
       }

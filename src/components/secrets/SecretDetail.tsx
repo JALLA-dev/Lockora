@@ -105,7 +105,7 @@ export function SecretDetail({ secret }: { secret: any }) {
   const executeReveal = async (activePrivateKey: CryptoKey, duration: number) => {
     setError('');
     try {
-      await recordSecretReveal(secret.id);
+      recordSecretReveal(secret.id).catch(err => console.error('[Secret Reveal] Non-blocking audit log notice:', err));
 
       const sdkRaw = await decryptAsymmetric(activePrivateKey, secret.encryptedDataKey);
       const sdk = await importKey(sdkRaw, { name: 'AES-GCM', length: 256 }, ['decrypt'], 'raw');

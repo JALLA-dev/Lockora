@@ -25,7 +25,7 @@ export interface SecurityEventConfig {
 export const EVENT_CONFIGS: Record<LockoraSecurityEventType, SecurityEventConfig> = {
   SECRET_REVEALED: {
     subject: 'Lockora Security Alert — Protected Secret Accessed',
-    summary: 'A protected secret was accessed in your Lockora account.',
+    summary: 'A protected secret in your Lockora account was accessed successfully.',
     action: 'Secret Revealed',
   },
   SECRET_COPIED: {
@@ -126,6 +126,17 @@ export function getUserVerifiedEmail(user: any): string | null {
 }
 
 /**
+ * Safely resolves user's full or display name for email greetings.
+ */
+export function getUserDisplayName(user: any): string {
+  if (!user) return 'Lockora User';
+  if (user.fullName && user.fullName.trim().length > 0) return user.fullName.trim();
+  const nameParts = [user.firstName, user.lastName].filter((p) => p && p.trim().length > 0);
+  if (nameParts.length > 0) return nameParts.join(' ').trim();
+  return 'Lockora User';
+}
+
+/**
  * Format date in UTC e.g. "28 September 2026, 15:30 UTC"
  */
 export function formatSecurityDate(date: Date = new Date()): string {
@@ -191,6 +202,7 @@ export function formatSecurityEmailContent(params: {
   event: LockoraSecurityEventType;
   serviceName?: string;
   actionName?: string;
+  userName?: string;
   time?: Date;
   details?: string;
 }): { subject: string; text: string; html: string } {
@@ -203,26 +215,30 @@ export function formatSecurityEmailContent(params: {
   const eventConfig = EVENT_CONFIGS[params.event] || EVENT_CONFIGS.SECURITY_EVENT;
   
   const subject = eventConfig.subject;
-  const summary = eventConfig.summary;
   const action = params.actionName || eventConfig.action;
   const service = params.serviceName || 'Lockora Data';
+  const greeting = params.userName && params.userName.trim().length > 0
+    ? `Dear ${params.userName.trim()},`
+    : 'Dear Lockora User,';
 
   const text = `${subject}
 
-${summary}
+${greeting}
 
-Service:
-${service}
+A protected secret in your Lockora account was accessed successfully.
 
-Action:
-${action}
+Service: ${service}
+Action: ${action}
+Time: ${timeStr}
 
-Time:
-${timeStr}
+This notification was generated because a protected secret was accessed.
 
-If you did not perform this action, review your Lockora security activity.
+If you performed this action, no further action is required.
 
-Do not include the actual secret value.`;
+If you did not perform this action, please sign in to Lockora and review your security activity immediately.
+
+Lockora Security Team
+Secure. Private. Protected.`;
 
   const html = `<!DOCTYPE html>
 <html>
@@ -230,39 +246,66 @@ Do not include the actual secret value.`;
   <meta charset="utf-8">
   <title>${escapeHtml(subject)}</title>
 </head>
-<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #09090b; color: #f4f4f5; margin: 0; padding: 24px;">
-  <div style="max-width: 560px; margin: 0 auto; background-color: #18181b; border: 1px solid #27272a; border-radius: 12px; padding: 32px; box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.5);">
-    <div style="margin-bottom: 24px;">
-      <h2 style="color: #6366f1; font-size: 20px; font-weight: 700; margin: 0; letter-spacing: -0.02em;">Lockora Security Alert</h2>
-    </div>
+<body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; background-color: #09090b; color: #f4f4f5; margin: 0; padding: 32px 16px;">
+  <div style="max-width: 580px; margin: 0 auto; background-color: #18181b; border: 1px solid #27272a; border-radius: 16px; padding: 36px; box-shadow: 0 20px 30px -10px rgba(0, 0, 0, 0.6);">
     
-    <p style="font-size: 15px; color: #e4e4e7; line-height: 1.6; margin-top: 0; margin-bottom: 24px;">
-      ${escapeHtml(summary)}
-    </p>
-
-    <div style="background-color: #09090b; border: 1px solid #27272a; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
-      <div style="margin-bottom: 14px;">
-        <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; font-weight: 600;">Service</span>
-        <div style="font-size: 15px; color: #ffffff; font-weight: 500; margin-top: 2px;">${escapeHtml(service)}</div>
+    <!-- Header with Lockora Shield Logo -->
+    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 28px; border-bottom: 1px solid #27272a; padding-bottom: 20px;">
+      <div style="display: flex; align-items: center; gap: 10px;">
+        <div style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%); width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-weight: bold; color: #ffffff; font-size: 18px; line-height: 36px; text-align: center;">
+          🔒
+        </div>
+        <span style="color: #ffffff; font-size: 20px; font-weight: 700; letter-spacing: -0.03em;">Lockora</span>
       </div>
-
-      <div style="margin-bottom: 14px;">
-        <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; font-weight: 600;">Action</span>
-        <div style="font-size: 15px; color: #ffffff; font-weight: 500; margin-top: 2px;">${escapeHtml(action)}</div>
-      </div>
-
-      <div>
-        <span style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; font-weight: 600;">Time</span>
-        <div style="font-size: 15px; color: #ffffff; font-weight: 500; margin-top: 2px;">${escapeHtml(timeStr)}</div>
-      </div>
+      <span style="font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: #818cf8; background-color: rgba(99, 102, 241, 0.15); padding: 4px 10px; border-radius: 20px; font-weight: 600; border: 1px solid rgba(99, 102, 241, 0.3);">
+        Security Alert
+      </span>
     </div>
 
-    <p style="font-size: 13px; color: #a1a1aa; line-height: 1.5; margin-bottom: 24px;">
-      If you did not perform this action, review your Lockora security activity.
+    <!-- Greeting & Summary -->
+    <p style="font-size: 16px; color: #ffffff; font-weight: 600; margin-top: 0; margin-bottom: 12px;">
+      ${escapeHtml(greeting)}
     </p>
 
-    <div style="border-top: 1px solid #27272a; padding-top: 16px; font-size: 12px; color: #71717a; text-align: center;">
-      Do not include the actual secret value. This is an automated notification.
+    <p style="font-size: 15px; color: #d4d4d8; line-height: 1.6; margin-top: 0; margin-bottom: 24px;">
+      A protected secret in your Lockora account was accessed successfully.
+    </p>
+
+    <!-- Metadata Details Box -->
+    <div style="background-color: #09090b; border: 1px solid #27272a; border-radius: 12px; padding: 20px; margin-bottom: 28px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        <tr>
+          <td style="padding-bottom: 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; font-weight: 600; width: 100px;">Service</td>
+          <td style="padding-bottom: 12px; font-size: 15px; color: #ffffff; font-weight: 600;">${escapeHtml(service)}</td>
+        </tr>
+        <tr>
+          <td style="padding-bottom: 12px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; font-weight: 600;">Action</td>
+          <td style="padding-bottom: 12px; font-size: 15px; color: #34d399; font-weight: 600;">${escapeHtml(action)}</td>
+        </tr>
+        <tr>
+          <td style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: #a1a1aa; font-weight: 600;">Time</td>
+          <td style="font-size: 15px; color: #ffffff; font-weight: 500;">${escapeHtml(timeStr)}</td>
+        </tr>
+      </table>
+    </div>
+
+    <!-- Security Guidance Callout -->
+    <div style="background-color: rgba(239, 68, 68, 0.08); border-left: 4px solid #f87171; border-radius: 0 8px 8px 0; padding: 16px 20px; margin-bottom: 28px;">
+      <p style="font-size: 13px; color: #fca5a5; margin: 0; line-height: 1.5; font-weight: 500;">
+        This notification was generated because a protected secret was accessed.
+      </p>
+      <p style="font-size: 13px; color: #e4e4e7; margin: 8px 0 0 0; line-height: 1.5;">
+        If you performed this action, no further action is required.
+      </p>
+      <p style="font-size: 13px; color: #f87171; margin: 8px 0 0 0; line-height: 1.5; font-weight: 600;">
+        If you did not perform this action, please sign in to Lockora and review your security activity immediately.
+      </p>
+    </div>
+
+    <!-- Footer -->
+    <div style="border-top: 1px solid #27272a; padding-top: 20px; margin-top: 10px; font-size: 12px; color: #71717a; text-align: center; line-height: 1.6;">
+      <strong style="color: #a1a1aa;">Lockora Security Team</strong><br/>
+      <span style="letter-spacing: 0.05em; color: #6366f1;">Secure. Private. Protected.</span>
     </div>
   </div>
 </body>

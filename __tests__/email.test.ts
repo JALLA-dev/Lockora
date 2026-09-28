@@ -126,8 +126,8 @@ describe('Lockora Email Alert System', () => {
       expect(emailContent.subject).toBe('Lockora Security Alert — Protected Secret Accessed');
       expect(emailContent.text).not.toContain('supersecretpassword');
       expect(emailContent.html).not.toContain('supersecretpassword');
-      expect(emailContent.text).toContain('Do not include the actual secret value.');
-      expect(emailContent.html).toContain('Do not include the actual secret value.');
+      expect(emailContent.text).toContain('This notification was generated because a protected secret was accessed.');
+      expect(emailContent.html).toContain('This notification was generated because a protected secret was accessed.');
     });
 
     it('should block sendSecurityAlert if sensitive pattern is detected in metadata', async () => {

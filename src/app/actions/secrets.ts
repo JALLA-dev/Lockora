@@ -6,7 +6,7 @@ import { secrets, auditLogs } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { emailService } from '@/lib/email';
-import { getUserVerifiedEmail } from '@/lib/email/utils';
+import { getUserVerifiedEmail, getUserDisplayName } from '@/lib/email/utils';
 
 export async function createSecret(data: {
   name: string;
@@ -48,12 +48,14 @@ export async function createSecret(data: {
   });
 
   const email = getUserVerifiedEmail(user);
+  const userName = getUserDisplayName(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
       event: 'SECRET_CREATED',
       serviceName: data.name,
       actionName: 'Secret Created',
+      userName,
       time: timestamp,
     });
   }
@@ -124,12 +126,14 @@ export async function recordSecretReveal(id: string) {
   });
 
   const email = getUserVerifiedEmail(user);
+  const userName = getUserDisplayName(user);
   if (email) {
     const sendResult = await emailService.sendSecurityAlert({
       to: email,
       event: 'SECRET_REVEALED',
       serviceName: secret?.name || 'Protected Secret',
       actionName: 'Secret Revealed',
+      userName,
       time: timestamp,
     });
     return sendResult;
@@ -158,12 +162,14 @@ export async function recordSecretCopy(id: string) {
   });
 
   const email = getUserVerifiedEmail(user);
+  const userName = getUserDisplayName(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
       event: 'SECRET_COPIED',
       serviceName: secret?.name || 'Protected Secret',
       actionName: 'Secret Copied',
+      userName,
       time: timestamp,
     });
   }
@@ -200,12 +206,14 @@ export async function deleteSecret(id: string, confirmationPhrase: string) {
   });
 
   const email = getUserVerifiedEmail(user);
+  const userName = getUserDisplayName(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
       event: 'SECRET_DELETED',
       serviceName: secret?.name || 'Protected Secret',
       actionName: 'Secret Deleted',
+      userName,
       time: timestamp,
     });
   }
@@ -238,12 +246,14 @@ export async function restoreSecret(id: string) {
   });
 
   const email = getUserVerifiedEmail(user);
+  const userName = getUserDisplayName(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
       event: 'SECRET_RESTORED',
       serviceName: secret?.name || 'Protected Secret',
       actionName: 'Secret Restored',
+      userName,
       time: timestamp,
     });
   }
@@ -309,12 +319,14 @@ export async function updateSecret(
   });
 
   const email = getUserVerifiedEmail(user);
+  const userName = getUserDisplayName(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
       event: 'SECRET_EDITED',
       serviceName: data.name,
       actionName: 'Secret Edited',
+      userName,
       time: timestamp,
     });
   }
