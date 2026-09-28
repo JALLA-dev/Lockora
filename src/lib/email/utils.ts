@@ -106,6 +106,26 @@ export const EVENT_CONFIGS: Record<LockoraSecurityEventType, SecurityEventConfig
 };
 
 /**
+ * Safely extracts the authenticated user's verified primary email address from Clerk user object.
+ */
+export function getUserVerifiedEmail(user: any): string | null {
+  if (!user || !user.emailAddresses || !Array.isArray(user.emailAddresses) || user.emailAddresses.length === 0) {
+    return null;
+  }
+  if (user.primaryEmailAddressId) {
+    const primary = user.emailAddresses.find((e: any) => e.id === user.primaryEmailAddressId);
+    if (primary && primary.emailAddress) {
+      return primary.emailAddress;
+    }
+  }
+  const verified = user.emailAddresses.find((e: any) => e.verification?.status === 'verified');
+  if (verified && verified.emailAddress) {
+    return verified.emailAddress;
+  }
+  return user.emailAddresses[0]?.emailAddress || null;
+}
+
+/**
  * Format date in UTC e.g. "28 September 2026, 15:30 UTC"
  */
 export function formatSecurityDate(date: Date = new Date()): string {
@@ -185,7 +205,7 @@ export function formatSecurityEmailContent(params: {
   const subject = eventConfig.subject;
   const summary = eventConfig.summary;
   const action = params.actionName || eventConfig.action;
-  const service = params.serviceName || 'Lockora Vault';
+  const service = params.serviceName || 'Lockora Data';
 
   const text = `${subject}
 

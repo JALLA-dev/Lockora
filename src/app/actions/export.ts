@@ -6,6 +6,7 @@ import { secrets, auditLogs } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import crypto from 'crypto';
 import { emailService } from '@/lib/email';
+import { getUserVerifiedEmail } from '@/lib/email/utils';
 
 export async function fetchAllSecretsForExport() {
   const user = await currentUser();
@@ -28,7 +29,7 @@ export async function fetchAllSecretsForExport() {
     timestamp,
   });
 
-  const email = user.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,

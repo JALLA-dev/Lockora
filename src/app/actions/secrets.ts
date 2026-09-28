@@ -6,6 +6,7 @@ import { secrets, auditLogs } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { emailService } from '@/lib/email';
+import { getUserVerifiedEmail } from '@/lib/email/utils';
 
 export async function createSecret(data: {
   name: string;
@@ -46,7 +47,7 @@ export async function createSecret(data: {
     timestamp,
   });
 
-  const email = user?.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
@@ -105,7 +106,7 @@ export async function getSecret(id: string) {
 
 export async function recordSecretReveal(id: string) {
   const user = await currentUser();
-  if (!user) return;
+  if (!user) return { success: false, error: 'Unauthorized' };
 
   const timestamp = new Date();
 
@@ -122,21 +123,24 @@ export async function recordSecretReveal(id: string) {
     where: and(eq(secrets.id, id), eq(secrets.userId, user.id)),
   });
 
-  const email = user.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
-    await emailService.sendSecurityAlert({
+    const sendResult = await emailService.sendSecurityAlert({
       to: email,
       event: 'SECRET_REVEALED',
       serviceName: secret?.name || 'Protected Secret',
       actionName: 'Secret Revealed',
       time: timestamp,
     });
+    return sendResult;
   }
+
+  return { success: false, error: 'User does not have a verified email address in Clerk.' };
 }
 
 export async function recordSecretCopy(id: string) {
   const user = await currentUser();
-  if (!user) return;
+  if (!user) return { success: false, error: 'Unauthorized' };
 
   const timestamp = new Date();
 
@@ -153,7 +157,7 @@ export async function recordSecretCopy(id: string) {
     where: and(eq(secrets.id, id), eq(secrets.userId, user.id)),
   });
 
-  const email = user.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
@@ -163,6 +167,8 @@ export async function recordSecretCopy(id: string) {
       time: timestamp,
     });
   }
+
+  return { success: true };
 }
 
 export async function deleteSecret(id: string, confirmationPhrase: string) {
@@ -193,7 +199,7 @@ export async function deleteSecret(id: string, confirmationPhrase: string) {
     timestamp,
   });
 
-  const email = user?.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
@@ -231,7 +237,7 @@ export async function restoreSecret(id: string) {
     timestamp,
   });
 
-  const email = user?.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
@@ -302,7 +308,7 @@ export async function updateSecret(
     timestamp,
   });
 
-  const email = user?.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,

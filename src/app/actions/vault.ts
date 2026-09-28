@@ -6,6 +6,7 @@ import { users, auditLogs, otps } from '@/db/schema';
 import { eq, and, gt } from 'drizzle-orm';
 import crypto from 'crypto';
 import { emailService } from '@/lib/email';
+import { getUserVerifiedEmail } from '@/lib/email/utils';
 
 export async function setupVault(
   otp: string | undefined,
@@ -50,11 +51,12 @@ export async function setupVault(
   }
 
   const timestamp = new Date();
+  const email = getUserVerifiedEmail(userObj);
 
   if (!existingUser) {
     await db.insert(users).values({
       id: userId,
-      email: userObj.emailAddresses[0]?.emailAddress || 'unknown@example.com',
+      email: email || 'unknown@example.com',
       vaultSalt,
       publicKey,
       encryptedPrivateKey,
@@ -83,7 +85,6 @@ export async function setupVault(
     timestamp,
   });
 
-  const email = userObj.emailAddresses[0]?.emailAddress;
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
@@ -168,7 +169,7 @@ export async function changeVaultPassword(
     })
     .where(eq(users.id, userId));
 
-  const email = userObj?.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(userObj);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
@@ -230,7 +231,7 @@ export async function recordVaultUnlockAttempt(success: boolean) {
     timestamp,
   });
 
-  const email = user.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(user);
   if (email) {
     await emailService.sendSecurityAlert({
       to: email,
@@ -245,7 +246,7 @@ export async function recordVaultUnlockAttempt(success: boolean) {
 export async function sendVaultOtp(purpose: 'SETUP' | 'CHANGE_PASSWORD') {
   const userObj = await currentUser();
   const userId = userObj?.id;
-  const email = userObj?.emailAddresses[0]?.emailAddress;
+  const email = getUserVerifiedEmail(userObj);
   
   if (!userId || !email) throw new Error('Unauthorized');
   
