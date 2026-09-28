@@ -5,9 +5,61 @@ import { emailService } from '@/lib/email';
 import { LockoraSecurityEventType } from '@/lib/email/utils';
 
 /**
+ * Server-side Resend test function sending to delivered@resend.dev
+ * FROM: onboarding@resend.dev
+ * TO: delivered@resend.dev
+ * SUBJECT: Lockora Resend Test
+ * BODY: Lockora email service is working.
+ * Uses: process.env.RESEND_API_KEY
+ */
+export async function sendResendDiagnosticTestEmail() {
+  const apiKey = process.env.RESEND_API_KEY;
+  const hasApiKey = Boolean(apiKey && apiKey.trim().length > 0);
+
+  if (!hasApiKey) {
+    return {
+      success: false,
+      error: 'RESEND_API_KEY is missing or empty in the active runtime environment.',
+      hasApiKey: false,
+    };
+  }
+
+  const { Resend } = await import('resend');
+  const resend = new Resend(apiKey?.trim());
+
+  try {
+    const response = await resend.emails.send({
+      from: process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
+      to: 'delivered@resend.dev',
+      subject: 'Lockora Resend Test',
+      html: '<p>Lockora email service is working.</p>',
+      text: 'Lockora email service is working.',
+    });
+
+    if (response.error) {
+      return {
+        success: false,
+        error: `Resend API Error [${response.error.name || 'API_ERROR'}]: ${response.error.message}`,
+        hasApiKey: true,
+      };
+    }
+
+    return {
+      success: true,
+      id: response.data?.id,
+      hasApiKey: true,
+    };
+  } catch (err: any) {
+    return {
+      success: false,
+      error: err?.message || 'Unexpected exception calling Resend API.',
+      hasApiKey: true,
+    };
+  }
+}
+
+/**
  * Requirement 13: Standalone development-only test email function
- * Subject: Lockora Test Email
- * Body: Lockora email service is working.
  */
 export async function sendStandaloneTestEmailAction() {
   const user = await currentUser();
