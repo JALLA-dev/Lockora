@@ -8,8 +8,7 @@ import { Card, CardHeader, CardTitle, CardDescription, CardContent } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { UserButton } from '@clerk/nextjs';
-import { Switch } from '@/components/ui/switch';
+import { useUser, UserButton } from '@clerk/nextjs';
 import {
   getVaultConfig,
   updateAutoLockDuration,
@@ -20,13 +19,13 @@ import {
 import {
   deriveMasterKey,
   encryptSymmetric,
-  generateSecretDataKey,
   exportKey,
   bufferToBase64,
 } from '@/lib/crypto';
 
 export default function SettingsPage() {
-  const { lockVault, isUnlocked, autoLockMinutes, setAutoLockMinutes, masterKey, privateKey } = useVault();
+  const { user } = useUser();
+  const { lockVault, autoLockMinutes, setAutoLockMinutes, privateKey } = useVault();
   const router = useRouter();
 
   // Settings states
@@ -183,15 +182,73 @@ export default function SettingsPage() {
     <div className="space-y-6 max-w-2xl px-4 md:px-0 pb-10">
       <div>
         <h2 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white">Settings</h2>
-        <p className="text-zinc-500 dark:text-zinc-400 mt-1">Manage your security, session, and notifications.</p>
+        <p className="text-zinc-500 dark:text-zinc-400 mt-1">Manage your security, MFA, session, and notifications.</p>
       </div>
 
-      {/* ── SECURITY ── */}
+      {/* ── MULTI-FACTOR AUTHENTICATION (MFA) ── */}
+      <Card className="border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/90 backdrop-blur-md shadow-lg relative z-10">
+        <CardHeader>
+          <CardTitle className="text-zinc-900 dark:text-white flex items-center justify-between">
+            <span>Multi-Factor Authentication (MFA)</span>
+            {user?.twoFactorEnabled ? (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 font-semibold">
+                Enabled
+              </span>
+            ) : (
+              <span className="text-xs px-2.5 py-1 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 font-semibold">
+                Not Enabled
+              </span>
+            )}
+          </CardTitle>
+          <CardDescription className="text-zinc-500 dark:text-zinc-400">
+            Protect your Lockora account login using Google Authenticator, Microsoft Authenticator, or standard TOTP apps.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {/* Authenticator App */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-zinc-200 dark:border-zinc-800">
+            <div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-white">Authenticator App (TOTP)</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                {user?.totpEnabled 
+                  ? 'Authenticator App is configured for your account.' 
+                  : 'Enroll a 2-Step Authenticator App (Google Authenticator, Microsoft Authenticator).'}
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dashboard/profile')}
+              className="border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white shrink-0"
+            >
+              {user?.totpEnabled ? 'Reconfigure App' : 'Configure App'}
+            </Button>
+          </div>
+
+          {/* Backup Codes */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <p className="text-sm font-medium text-zinc-900 dark:text-white">Backup Codes</p>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">
+                Generate or view one-time backup codes for account recovery via Clerk's secure flow.
+              </p>
+            </div>
+            <Button
+              variant="outline"
+              onClick={() => router.push('/dashboard/profile')}
+              className="border-zinc-300 dark:border-zinc-700 text-zinc-900 dark:text-white shrink-0"
+            >
+              Manage Backup Codes
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ── LOCKORA SECURITY ── */}
       <Card className="border-zinc-200 dark:border-zinc-800 bg-white/95 dark:bg-zinc-900/90 backdrop-blur-md shadow-lg relative z-10">
         <CardHeader>
           <CardTitle className="text-zinc-900 dark:text-white">Lockora Security</CardTitle>
           <CardDescription className="text-zinc-500 dark:text-zinc-400">
-            These settings protect your sensitive data — separate from your account login.
+            These settings protect your sensitive data — separate from your account login & MFA.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -317,7 +374,7 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-zinc-900 dark:text-white">Audit & Security Activity</CardTitle>
           <CardDescription className="text-zinc-500 dark:text-zinc-400">
-            Review detailed security events, access logs, and edits for your Lockora account.
+            Review detailed security events, access logs, MFA updates, and edits for your Lockora account.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -338,8 +395,8 @@ export default function SettingsPage() {
         <CardContent className="space-y-4">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <Label className="text-sm font-medium text-zinc-900 dark:text-white">Security Notifications</Label>
-              <p className="text-xs text-zinc-500 dark:text-zinc-400">Receive alerts when your security settings change.</p>
+              <Label className="text-sm font-medium text-zinc-900 dark:text-white">Security & MFA Notifications</Label>
+              <p className="text-xs text-zinc-500 dark:text-zinc-400">Receive alerts when your security settings or MFA state changes.</p>
             </div>
             <div className="h-5 w-9 rounded-full bg-indigo-600 relative cursor-pointer"><div className="absolute right-1 top-1 h-3 w-3 rounded-full bg-white"></div></div>
           </div>
@@ -365,13 +422,13 @@ export default function SettingsPage() {
         <CardHeader>
           <CardTitle className="text-zinc-900 dark:text-white">Account Information</CardTitle>
           <CardDescription className="text-zinc-500 dark:text-zinc-400">
-            Manage your Clerk account login and active sessions.
+            Manage your Clerk account login, MFA credentials, and active sessions.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-3">
             <UserButton appearance={{ elements: { rootBox: 'flex', avatarBox: 'w-10 h-10' } }} />
-            <span className="text-sm text-zinc-500 dark:text-zinc-400">Manage Account</span>
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">Manage Account & Security</span>
           </div>
         </CardContent>
       </Card>
