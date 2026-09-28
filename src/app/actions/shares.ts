@@ -3,7 +3,7 @@
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { db } from '@/db';
 import { users, secretShares, auditLogs } from '@/db/schema';
-import { eq, and } from 'drizzle-orm';
+import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
 import { emailService } from '@/lib/email';
 
@@ -17,7 +17,7 @@ export async function lookupUserForShare(email: string) {
   });
 
   if (!user || !user.publicKey) {
-    throw new Error('User not found or has not set up their Vault.');
+    throw new Error('User not found or has not set up Lockora.');
   }
 
   return user;
@@ -54,17 +54,18 @@ export async function createShare(
     timestamp,
   });
 
-  // Fetch recipient email to send alert
   const recipient = await db.query.users.findFirst({
     where: eq(users.id, recipientId),
   });
 
   if (recipient && recipient.email) {
-    await emailService.sendSecurityAlert(
-      recipient.email,
-      'A new secret has been shared with you in Lockora.',
-      timestamp
-    );
+    await emailService.sendSecurityAlert({
+      to: recipient.email,
+      event: 'SECURITY_EVENT',
+      serviceName: 'Shared Secret',
+      actionName: 'Secret Shared With You',
+      time: timestamp,
+    });
   }
 
   return { success: true };

@@ -16,10 +16,12 @@ export async function createSecret(data: {
   expiryAt?: string;
   requiresRotation?: boolean;
 }) {
-  const { userId } = await auth();
+  const user = await currentUser();
+  const userId = user?.id;
   if (!userId) throw new Error('Unauthorized');
 
   const newId = crypto.randomUUID();
+  const timestamp = new Date();
 
   await db.insert(secrets).values({
     id: newId,
@@ -31,8 +33,8 @@ export async function createSecret(data: {
     encryptedDataKey: data.encryptedDataKey,
     expiryAt: data.expiryAt ? new Date(data.expiryAt) : null,
     requiresRotation: data.requiresRotation || false,
-    createdAt: new Date(),
-    updatedAt: new Date(),
+    createdAt: timestamp,
+    updatedAt: timestamp,
   });
 
   await db.insert(auditLogs).values({
@@ -41,8 +43,19 @@ export async function createSecret(data: {
     action: 'SECRET_CREATED',
     resource: newId,
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
+
+  const email = user?.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECRET_CREATED',
+      serviceName: data.name,
+      actionName: 'Secret Created',
+      time: timestamp,
+    });
+  }
 
   return { success: true, id: newId };
 }
@@ -105,43 +118,70 @@ export async function recordSecretReveal(id: string) {
     timestamp,
   });
 
-  if (user.emailAddresses[0]) {
-    try {
-      await emailService.sendSecurityAlert(
-        user.emailAddresses[0].emailAddress,
-        'Your Lockora secret was accessed.',
-        timestamp
-      );
-    } catch (err) {
-      console.error('Failed to send security alert:', err);
-    }
+  const secret = await db.query.secrets.findFirst({
+    where: and(eq(secrets.id, id), eq(secrets.userId, user.id)),
+  });
+
+  const email = user.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECRET_REVEALED',
+      serviceName: secret?.name || 'Protected Secret',
+      actionName: 'Secret Revealed',
+      time: timestamp,
+    });
   }
 }
 
 export async function recordSecretCopy(id: string) {
-  const { userId } = await auth();
-  if (!userId) return;
+  const user = await currentUser();
+  if (!user) return;
+
+  const timestamp = new Date();
 
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
-    userId,
+    userId: user.id,
     action: 'SECRET_COPIED',
     resource: id,
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
+
+  const secret = await db.query.secrets.findFirst({
+    where: and(eq(secrets.id, id), eq(secrets.userId, user.id)),
+  });
+
+  const email = user.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECRET_COPIED',
+      serviceName: secret?.name || 'Protected Secret',
+      actionName: 'Secret Copied',
+      time: timestamp,
+    });
+  }
 }
 
 export async function deleteSecret(id: string, confirmationPhrase: string) {
-  const { userId } = await auth();
+  const user = await currentUser();
+  const userId = user?.id;
   if (!userId) throw new Error('Unauthorized');
 
   if (confirmationPhrase !== 'DELETE PERMANENTLY') {
     throw new Error('Invalid confirmation phrase. Secret deletion aborted.');
   }
 
+  const secret = await db.query.secrets.findFirst({
+    where: and(eq(secrets.id, id), eq(secrets.userId, userId)),
+  });
+
+  const timestamp = new Date();
+
   await db.update(secrets)
-    .set({ isDeleted: true, deletedAt: new Date(), updatedAt: new Date() })
+    .set({ isDeleted: true, deletedAt: timestamp, updatedAt: timestamp })
     .where(and(eq(secrets.id, id), eq(secrets.userId, userId)));
 
   await db.insert(auditLogs).values({
@@ -150,18 +190,36 @@ export async function deleteSecret(id: string, confirmationPhrase: string) {
     action: 'SECRET_DELETED',
     resource: id,
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
+
+  const email = user?.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECRET_DELETED',
+      serviceName: secret?.name || 'Protected Secret',
+      actionName: 'Secret Deleted',
+      time: timestamp,
+    });
+  }
 
   return { success: true };
 }
 
 export async function restoreSecret(id: string) {
-  const { userId } = await auth();
+  const user = await currentUser();
+  const userId = user?.id;
   if (!userId) throw new Error('Unauthorized');
 
+  const secret = await db.query.secrets.findFirst({
+    where: and(eq(secrets.id, id), eq(secrets.userId, userId)),
+  });
+
+  const timestamp = new Date();
+
   await db.update(secrets)
-    .set({ isDeleted: false, deletedAt: null, updatedAt: new Date() })
+    .set({ isDeleted: false, deletedAt: null, updatedAt: timestamp })
     .where(and(eq(secrets.id, id), eq(secrets.userId, userId)));
 
   await db.insert(auditLogs).values({
@@ -170,8 +228,19 @@ export async function restoreSecret(id: string) {
     action: 'SECRET_RESTORED',
     resource: id,
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
+
+  const email = user?.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECRET_RESTORED',
+      serviceName: secret?.name || 'Protected Secret',
+      actionName: 'Secret Restored',
+      time: timestamp,
+    });
+  }
 
   return { success: true };
 }
@@ -186,7 +255,8 @@ export async function updateSecret(
     editReason: string;
   }
 ) {
-  const { userId } = await auth();
+  const user = await currentUser();
+  const userId = user?.id;
   if (!userId) throw new Error('Unauthorized');
 
   if (!data.editReason || data.editReason.trim() === '') {
@@ -201,13 +271,15 @@ export async function updateSecret(
     throw new Error('Secret not found or access denied');
   }
 
+  const timestamp = new Date();
+
   await db.update(secrets)
     .set({
       name: data.name,
       category: data.category,
       tags: data.tags || '[]',
       encryptedData: data.encryptedData,
-      updatedAt: new Date(),
+      updatedAt: timestamp,
     })
     .where(and(eq(secrets.id, id), eq(secrets.userId, userId)));
 
@@ -217,18 +289,29 @@ export async function updateSecret(
     action: 'SECRET_UPDATED',
     resource: id,
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
 
-  // Log the reason as a separate audit entry for visibility, or append to action
+  // Log the reason as a separate audit entry for visibility
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
     userId,
     action: `SECRET_EDIT_REASON: ${data.editReason.trim().substring(0, 100)}`,
     resource: id,
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
+
+  const email = user?.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECRET_EDITED',
+      serviceName: data.name,
+      actionName: 'Secret Edited',
+      time: timestamp,
+    });
+  }
 
   return { success: true };
 }

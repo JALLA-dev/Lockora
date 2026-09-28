@@ -18,24 +18,25 @@ export async function fetchAllSecretsForExport() {
     ),
   });
 
-  // Record audit log
   const timestamp = new Date();
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
     userId: user.id,
     action: 'EXPORT_CREATED',
-    resource: 'Vault',
+    resource: 'Lockora Data',
     result: 'SUCCESS',
     timestamp,
   });
 
-  // Send security alert
-  if (user.emailAddresses[0]) {
-    await emailService.sendSecurityAlert(
-      user.emailAddresses[0].emailAddress,
-      'Vault Export Created',
-      timestamp
-    );
+  const email = user.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECURITY_EVENT',
+      serviceName: 'Lockora Export',
+      actionName: 'Lockora Data Export Created',
+      time: timestamp,
+    });
   }
 
   return allSecrets;

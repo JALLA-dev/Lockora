@@ -40,7 +40,7 @@ export async function setupVault(
     await db.delete(otps).where(eq(otps.userId, userId));
   }
 
-  // Check if user exists, if not, create them. Usually handled via webhooks but we can upsert here.
+  // Check if user exists, if not, create them.
   const existingUser = await db.query.users.findFirst({
     where: eq(users.id, userId),
   });
@@ -49,8 +49,9 @@ export async function setupVault(
     throw new Error('Lockora is already set up.');
   }
 
+  const timestamp = new Date();
+
   if (!existingUser) {
-    // If we haven't synced from Clerk via webhook yet, just insert the minimum
     await db.insert(users).values({
       id: userId,
       email: userObj.emailAddresses[0]?.emailAddress || 'unknown@example.com',
@@ -58,47 +59,44 @@ export async function setupVault(
       publicKey,
       encryptedPrivateKey,
       encryptedPrivateKeyRecovery: encryptedPrivateKeyRecovery || null,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      createdAt: timestamp,
+      updatedAt: timestamp,
     });
   } else {
-    // Update existing user with vault info
     await db.update(users)
       .set({
         vaultSalt,
         publicKey,
         encryptedPrivateKey,
         encryptedPrivateKeyRecovery: encryptedPrivateKeyRecovery || null,
-        updatedAt: new Date(),
+        updatedAt: timestamp,
       })
       .where(eq(users.id, userId));
   }
 
-  // Log the setup event
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
     userId,
     action: 'LOCKORA_PASSWORD_CREATED',
-    resource: 'Vault',
+    resource: 'Lockora',
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
 
-  await emailService.sendSecurityAlert(
-    userObj.emailAddresses[0]?.emailAddress || '',
-    'Lockora Password created',
-    new Date()
-  );
+  const email = userObj.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'SECURITY_EVENT',
+      serviceName: 'Lockora Core',
+      actionName: 'Lockora Password Created',
+      time: timestamp,
+    });
+  }
 
   return { success: true };
 }
 
-/**
- * Fetches the vault configuration for the current user.
- * NOTE: This does NOT enforce unlock rate limiting — that is enforced
- * only at the unlock action to prevent locking users out of the dashboard
- * after failed attempts.
- */
 export async function getVaultConfig() {
   const { userId } = await auth();
   
@@ -124,10 +122,6 @@ export async function getVaultConfig() {
   };
 }
 
-/**
- * Updates the auto-lock duration (in minutes) for the current user.
- * Minimum 1 minute, maximum 240 minutes (4 hours).
- */
 export async function updateAutoLockDuration(minutes: number) {
   const { userId } = await auth();
   if (!userId) throw new Error('Unauthorized');
@@ -142,7 +136,7 @@ export async function updateAutoLockDuration(minutes: number) {
     id: crypto.randomUUID(),
     userId,
     action: 'SETTINGS_AUTO_LOCK_UPDATED',
-    resource: 'Vault',
+    resource: 'Lockora',
     result: 'SUCCESS',
     timestamp: new Date(),
   });
@@ -150,11 +144,6 @@ export async function updateAutoLockDuration(minutes: number) {
   return { success: true, autoLockMinutes: clamped };
 }
 
-/**
- * Re-encrypts the user's RSA private key under a new vault password.
- * Accepts the NEW encrypted private key material (produced client-side)
- * so the server never sees the old or new plaintext password.
- */
 export async function changeVaultPassword(
   otp: string,
   newVaultSalt: string,
@@ -166,41 +155,42 @@ export async function changeVaultPassword(
   if (!userId) throw new Error('Unauthorized');
 
   const user = await db.query.users.findFirst({ where: eq(users.id, userId) });
-  if (!user || !user.vaultSalt) throw new Error('Vault not set up.');
+  if (!user || !user.vaultSalt) throw new Error('Lockora is not set up.');
+
+  const timestamp = new Date();
 
   await db.update(users)
     .set({
       vaultSalt: newVaultSalt,
       encryptedPrivateKey: newEncryptedPrivateKey,
       encryptedPrivateKeyRecovery: newEncryptedPrivateKeyRecovery ?? user.encryptedPrivateKeyRecovery,
-      updatedAt: new Date(),
+      updatedAt: timestamp,
     })
     .where(eq(users.id, userId));
 
-  if (userObj?.emailAddresses[0]) {
-    await emailService.sendSecurityAlert(
-      userObj.emailAddresses[0].emailAddress,
-      'Your Lockora Password was changed',
-      new Date()
-    );
+  const email = userObj?.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: 'LOCKORA_PASSWORD_CHANGED',
+      serviceName: 'Lockora Access',
+      actionName: 'Lockora Password Changed',
+      time: timestamp,
+    });
   }
 
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
     userId,
-    action: 'VAULT_PASSWORD_CHANGED',
-    resource: 'Vault',
+    action: 'LOCKORA_PASSWORD_CHANGED',
+    resource: 'Lockora',
     result: 'SUCCESS',
-    timestamp: new Date(),
+    timestamp,
   });
 
   return { success: true };
 }
 
-/**
- * Checks unlock rate limiting. Call this from the unlock page before
- * attempting to decrypt, NOT from getVaultConfig.
- */
 export async function checkUnlockRateLimit(): Promise<{ allowed: boolean; minutesRemaining?: number }> {
   const { userId } = await auth();
   if (!userId) return { allowed: false };
@@ -209,14 +199,13 @@ export async function checkUnlockRateLimit(): Promise<{ allowed: boolean; minute
   const recentFailures = await db.query.auditLogs.findMany({
     where: (logs, { and, eq, gte }) => and(
       eq(logs.userId, userId),
-      eq(logs.action, 'VAULT_UNLOCK_FAILED'),
+      eq(logs.action, 'LOCKORA_PASSWORD_FAILED'),
       gte(logs.timestamp, fifteenMinutesAgo)
     ),
     orderBy: (logs, { desc }) => [desc(logs.timestamp)],
   });
 
   if (recentFailures.length >= 5) {
-    // Tell UI how many minutes until oldest failure expires
     const oldestFailure = recentFailures[recentFailures.length - 1];
     const expiresAt = new Date(oldestFailure.timestamp.getTime() + 15 * 60 * 1000);
     const minutesRemaining = Math.ceil((expiresAt.getTime() - Date.now()) / 60000);
@@ -235,18 +224,21 @@ export async function recordVaultUnlockAttempt(success: boolean) {
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
     userId: user.id,
-    action: success ? 'VAULT_UNLOCK_SUCCESS' : 'VAULT_UNLOCK_FAILED',
-    resource: 'Vault',
+    action: success ? 'LOCKORA_PASSWORD_VERIFIED' : 'LOCKORA_PASSWORD_FAILED',
+    resource: 'Lockora',
     result: success ? 'SUCCESS' : 'FAILURE',
     timestamp,
   });
 
-  if (success && user.emailAddresses[0]) {
-    await emailService.sendSecurityAlert(
-      user.emailAddresses[0].emailAddress,
-      'Vault Unlocked',
-      timestamp
-    );
+  const email = user.emailAddresses[0]?.emailAddress;
+  if (email) {
+    await emailService.sendSecurityAlert({
+      to: email,
+      event: success ? 'LOCKORA_PASSWORD_VERIFIED' : 'LOCKORA_PASSWORD_FAILED',
+      serviceName: 'Lockora Access',
+      actionName: success ? 'Lockora Password Verified' : 'Failed Lockora Password Attempt',
+      time: timestamp,
+    });
   }
 }
 
@@ -257,11 +249,10 @@ export async function sendVaultOtp(purpose: 'SETUP' | 'CHANGE_PASSWORD') {
   
   if (!userId || !email) throw new Error('Unauthorized');
   
-  // Clean old OTPs
   await db.delete(otps).where(eq(otps.userId, userId));
 
   const code = Array.from({length: 6}, () => Math.floor(Math.random() * 10)).join('');
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+  const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
 
   await db.insert(otps).values({
     id: crypto.randomUUID(),
@@ -273,9 +264,14 @@ export async function sendVaultOtp(purpose: 'SETUP' | 'CHANGE_PASSWORD') {
   });
 
   const eventName = purpose === 'SETUP' ? 'Lockora Password Creation Verification' : 'Lockora Password Change Verification';
-  await emailService.sendSecurityAlert(email, `${eventName}. Your code is: ${code}`, new Date());
+  await emailService.sendSecurityAlert({
+    to: email,
+    event: 'SECURITY_EVENT',
+    serviceName: 'Verification Code',
+    actionName: eventName,
+    time: new Date(),
+  });
   
-  // Mask email for client
   const maskedEmail = email.replace(/(.{2})(.*)(@.*)/, '$1***$3');
   return { success: true, email: maskedEmail };
 }
