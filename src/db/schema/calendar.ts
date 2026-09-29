@@ -41,14 +41,13 @@ export const oauthStates = pgTable('oauth_states', {
   createdAt: timestamp('created_at').notNull(),
 });
 
-export const availabilityRules = pgTable('availability_rules', {
+export const availabilitySchedules = pgTable('availability_schedules', {
   id: text('id').primaryKey(),
-  userId: text('user_id').notNull().unique(),
+  userId: text('user_id').notNull(),
+  name: text('name').notNull(), // e.g. "Working Hours", "Consultation Hours"
   timeZone: text('time_zone').default('UTC').notNull(),
   weeklyHours: jsonb('weekly_hours').notNull(), // { mon: [{ start: "09:00", end: "17:00" }], ... }
-  bufferMinutes: integer('buffer_minutes').default(15).notNull(),
-  minNoticeMinutes: integer('min_notice_minutes').default(120).notNull(),
-  maxBookingDays: integer('max_booking_days').default(30).notNull(),
+  isDefault: boolean('is_default').default(false).notNull(),
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
 });
@@ -63,6 +62,21 @@ export const meetingTypes = pgTable('meeting_types', {
   locationType: text('location_type').default('teams').notNull(), // 'teams' | 'custom'
   locationUrl: text('location_url'),
   isActive: boolean('is_active').default(true).notNull(),
+  isSecret: boolean('is_secret').default(false).notNull(),
+  
+  // Scheduling
+  scheduleId: text('schedule_id'), // Relates to availability_schedules
+  
+  // Limits and buffers
+  bufferBefore: integer('buffer_before').default(0).notNull(),
+  bufferAfter: integer('buffer_after').default(0).notNull(),
+  minNoticeMinutes: integer('min_notice_minutes').default(120).notNull(),
+  maxBookingDays: integer('max_booking_days').default(30).notNull(),
+  maxBookingsPerDay: integer('max_bookings_per_day'),
+  
+  // Questions
+  questions: jsonb('questions'), // [{ name, type, required }]
+  
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
 });
@@ -87,11 +101,13 @@ export const bookings = pgTable('bookings', {
   visitorName: text('visitor_name').notNull(),
   visitorEmail: text('visitor_email').notNull(),
   visitorNotes: text('visitor_notes'),
+  answers: jsonb('answers'), // Custom question answers
   startTime: timestamp('start_time').notNull(),
   endTime: timestamp('end_time').notNull(),
   status: text('status').default('CONFIRMED').notNull(), // 'PENDING' | 'CONFIRMED' | 'CANCELLED' | 'RESCHEDULED' | 'FAILED'
   meetingUrl: text('meeting_url'),
   cancellationReason: text('cancellation_reason'),
+  secureToken: text('secure_token').notNull(), // Used for public reschedule/cancel
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
 });

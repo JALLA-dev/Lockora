@@ -42,14 +42,13 @@ export async function ensureCalendarTablesExist() {
         "revoked_at" timestamp
       );
 
-      CREATE TABLE IF NOT EXISTS "availability_rules" (
+      CREATE TABLE IF NOT EXISTS "availability_schedules" (
         "id" text PRIMARY KEY NOT NULL,
-        "user_id" text NOT NULL UNIQUE,
+        "user_id" text NOT NULL,
+        "name" text NOT NULL,
         "time_zone" text DEFAULT 'UTC' NOT NULL,
         "weekly_hours" jsonb NOT NULL,
-        "buffer_minutes" integer DEFAULT 15 NOT NULL,
-        "min_notice_minutes" integer DEFAULT 120 NOT NULL,
-        "max_booking_days" integer DEFAULT 30 NOT NULL,
+        "is_default" boolean DEFAULT false NOT NULL,
         "created_at" timestamp NOT NULL,
         "updated_at" timestamp NOT NULL
       );
@@ -64,6 +63,14 @@ export async function ensureCalendarTablesExist() {
         "location_type" text DEFAULT 'teams' NOT NULL,
         "location_url" text,
         "is_active" boolean DEFAULT true NOT NULL,
+        "is_secret" boolean DEFAULT false NOT NULL,
+        "schedule_id" text,
+        "buffer_before" integer DEFAULT 0 NOT NULL,
+        "buffer_after" integer DEFAULT 0 NOT NULL,
+        "min_notice_minutes" integer DEFAULT 120 NOT NULL,
+        "max_booking_days" integer DEFAULT 30 NOT NULL,
+        "max_bookings_per_day" integer,
+        "questions" jsonb,
         "created_at" timestamp NOT NULL,
         "updated_at" timestamp NOT NULL
       );
@@ -88,11 +95,13 @@ export async function ensureCalendarTablesExist() {
         "visitor_name" text NOT NULL,
         "visitor_email" text NOT NULL,
         "visitor_notes" text,
+        "answers" jsonb,
         "start_time" timestamp NOT NULL,
         "end_time" timestamp NOT NULL,
         "status" text DEFAULT 'CONFIRMED' NOT NULL,
         "meeting_url" text,
         "cancellation_reason" text,
+        "secure_token" text NOT NULL DEFAULT 'legacy',
         "created_at" timestamp NOT NULL,
         "updated_at" timestamp NOT NULL
       );
@@ -120,6 +129,20 @@ export async function ensureCalendarTablesExist() {
         ADD COLUMN IF NOT EXISTS "calendar_email" text,
         ADD COLUMN IF NOT EXISTS "selected_calendars" text,
         ADD COLUMN IF NOT EXISTS "destination_calendar" text;
+        
+      ALTER TABLE "meeting_types"
+        ADD COLUMN IF NOT EXISTS "is_secret" boolean DEFAULT false NOT NULL,
+        ADD COLUMN IF NOT EXISTS "schedule_id" text,
+        ADD COLUMN IF NOT EXISTS "buffer_before" integer DEFAULT 0 NOT NULL,
+        ADD COLUMN IF NOT EXISTS "buffer_after" integer DEFAULT 0 NOT NULL,
+        ADD COLUMN IF NOT EXISTS "min_notice_minutes" integer DEFAULT 120 NOT NULL,
+        ADD COLUMN IF NOT EXISTS "max_booking_days" integer DEFAULT 30 NOT NULL,
+        ADD COLUMN IF NOT EXISTS "max_bookings_per_day" integer,
+        ADD COLUMN IF NOT EXISTS "questions" jsonb;
+        
+      ALTER TABLE "bookings"
+        ADD COLUMN IF NOT EXISTS "answers" jsonb,
+        ADD COLUMN IF NOT EXISTS "secure_token" text NOT NULL DEFAULT 'legacy';
     `).catch(() => { /* columns may already exist */ });
 
     // Clean up expired OAuth states
