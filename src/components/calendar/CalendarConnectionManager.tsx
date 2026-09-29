@@ -2,54 +2,35 @@
 
 import { useState, useEffect } from 'react';
 import { Calendar, CheckCircle2, RefreshCw, Trash2, ExternalLink, ShieldCheck, Mail } from 'lucide-react';
-import {
-  disconnectCalendar,
-  fetchConnectionCalendars,
-  updateSelectedCalendar,
-} from '@/app/actions/calendar-connections';
+import { disconnectCalendar, updateSelectedCalendar, getCalendarState } from '@/app/actions/calendar-connections';
 
-interface Connection {
-  id: string;
-  provider: string;
-  providerAccountId: string;
-  calendarId: string;
-  destinationCalendar?: string | null;
-  calendarEmail?: string | null;
-  status: string;
-  createdAt: Date;
-}
-
-export function CalendarConnectionManager({ connections }: { connections: Connection[] }) {
+export function CalendarConnectionManager({ connections: _oldConnections }: { connections: any[] }) {
   const [loading, setLoading] = useState<string | null>(null);
-  const [availableCalendars, setAvailableCalendars] = useState<Record<string, any[]>>({});
-  const [selectedCalIds, setSelectedCalIds] = useState<Record<string, string>>({});
+  const [calendarState, setCalendarState] = useState<any>(null);
+  const [isFetchingState, setIsFetchingState] = useState(true);
 
-  const outlookConn = connections.find((c) => c.provider === 'microsoft' && c.status === 'ACTIVE');
-  const googleConn = connections.find((c) => c.provider === 'google' && c.status === 'ACTIVE');
+  const fetchState = async () => {
+    setIsFetchingState(true);
+    try {
+      const state = await getCalendarState();
+      setCalendarState(state);
+    } catch (err) {
+      console.error('Failed to fetch calendar state', err);
+    } finally {
+      setIsFetchingState(false);
+    }
+  };
 
   useEffect(() => {
-    [outlookConn, googleConn].forEach((conn) => {
-      if (conn) {
-        setSelectedCalIds((prev) => ({ ...prev, [conn.id]: conn.destinationCalendar || conn.calendarId || 'primary' }));
-        fetchConnectionCalendars(conn.id)
-          .then((cals) => {
-            if (cals && cals.length > 0) {
-              setAvailableCalendars((prev) => ({ ...prev, [conn.id]: cals }));
-            }
-          })
-          .catch(() => {
-            // Non-fatal
-          });
-      }
-    });
-  }, [outlookConn?.id, googleConn?.id]);
+    fetchState();
+  }, []);
 
   const handleDisconnect = async (id: string, providerName: string) => {
     if (!confirm(`Are you sure you want to disconnect ${providerName}?`)) return;
     setLoading(id);
     try {
       await disconnectCalendar(id);
-      window.location.reload();
+      await fetchState();
     } catch (err: any) {
       alert(err?.message || 'Failed to disconnect');
     } finally {
@@ -58,18 +39,31 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
   };
 
   const handleCalendarChange = async (connId: string, calId: string) => {
-    setSelectedCalIds((prev) => ({ ...prev, [connId]: calId }));
     try {
       await updateSelectedCalendar(connId, calId);
+      await fetchState();
     } catch (err: any) {
       alert(err?.message || 'Failed to update selected calendar');
     }
   };
 
-  const ProviderCard = ({ conn, title, providerKey, connectUrl, description }: { conn?: Connection, title: string, providerKey: string, connectUrl: string, description: string }) => {
-    const displayEmail = conn?.calendarEmail || conn?.providerAccountId || null;
-    const cals = conn ? availableCalendars[conn.id] || [] : [];
-    const selected = conn ? selectedCalIds[conn.id] || 'primary' : 'primary';
+  const ProviderCard = ({ 
+    providerKey, 
+    title, 
+    connectUrl, 
+    description 
+  }: { 
+    providerKey: 'google' | 'microsoft', 
+    title: string, 
+    connectUrl: string, 
+    description: string 
+  }) => {
+    const providerState = calendarState?.[providerKey];
+    const isConnected = providerState?.connected;
+    const connId = providerState?.id;
+    const displayEmail = providerState?.account;
+    const cals = providerState?.calendars || [];
+    const selected = providerState?.destinationCalendar || 'primary';
 
     return (
       <div className="p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-zinc-50/50 dark:bg-zinc-950/50 flex flex-col justify-between">
@@ -84,7 +78,9 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
                 <p className="text-xs text-zinc-500 dark:text-zinc-400">{description}</p>
               </div>
             </div>
-            {conn ? (
+            {isFetchingState ? (
+              <span className="text-xs text-zinc-400 font-medium animate-pulse">Loading...</span>
+            ) : isConnected ? (
               <span className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
                 <CheckCircle2 className="w-3.5 h-3.5" /> Connected
               </span>
@@ -93,7 +89,7 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
             )}
           </div>
 
-          {conn && (
+          {isConnected && (
             <div className="space-y-3 my-4 bg-zinc-100 dark:bg-zinc-900/80 p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
               {displayEmail && (
                 <div className="flex items-center justify-between text-xs">
@@ -108,11 +104,11 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
                 <span className="text-zinc-500">Destination Calendar:</span>
                 <select
                   value={selected}
-                  onChange={(e) => handleCalendarChange(conn.id, e.target.value)}
+                  onChange={(e) => handleCalendarChange(connId, e.target.value)}
                   className="text-xs rounded border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-2 py-1 text-zinc-900 dark:text-white font-medium max-w-[200px] truncate"
                 >
                   {cals.length > 0 ? (
-                    cals.map((c) => (
+                    cals.map((c: any) => (
                       <option key={c.id} value={c.id}>
                         {c.name} {c.isPrimary ? '(Primary)' : ''}
                       </option>
@@ -127,18 +123,18 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
         </div>
 
         <div className="mt-4 pt-3 border-t border-zinc-200 dark:border-zinc-800 flex items-center justify-between">
-          {conn ? (
+          {isConnected ? (
             <div className="flex items-center justify-between w-full">
               <button
-                onClick={() => window.location.reload()}
+                onClick={fetchState}
                 className="flex items-center gap-1 text-xs font-medium text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-white"
               >
-                <RefreshCw className="w-3.5 h-3.5" /> Sync
+                <RefreshCw className={`w-3.5 h-3.5 ${isFetchingState ? 'animate-spin' : ''}`} /> Sync
               </button>
 
               <button
-                onClick={() => handleDisconnect(conn.id, title)}
-                disabled={loading === conn.id}
+                onClick={() => handleDisconnect(connId, title)}
+                disabled={loading === connId}
                 className="flex items-center gap-1.5 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 hover:bg-red-500/10 px-3 py-1.5 rounded-md transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" /> Disconnect
@@ -170,16 +166,14 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <ProviderCard 
-            conn={googleConn} 
+            providerKey="google"
             title="Google Calendar" 
-            providerKey="google" 
             connectUrl="/api/calendar/google/connect" 
             description="Google Workspace & Gmail Accounts" 
           />
           <ProviderCard 
-            conn={outlookConn} 
+            providerKey="microsoft"
             title="Microsoft Outlook" 
-            providerKey="microsoft" 
             connectUrl="/api/calendar/outlook/connect" 
             description="Microsoft 365, Outlook.com & Work Accounts" 
           />

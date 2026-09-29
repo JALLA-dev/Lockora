@@ -41,6 +41,44 @@ export async function getCalendarConnections() {
   }
 }
 
+export async function getCalendarState() {
+  const { userId } = await auth();
+  if (!userId) throw new Error('AUTH_EXPIRED');
+
+  const state: any = {
+    google: { connected: false },
+    microsoft: { connected: false }
+  };
+
+  try {
+    const connections = await getCalendarConnections();
+    
+    for (const provider of ['google', 'microsoft']) {
+      const conn = connections.find(c => c.provider === provider && c.status === 'ACTIVE');
+      if (conn) {
+        state[provider] = {
+          connected: true,
+          id: conn.id,
+          account: conn.calendarEmail || conn.providerAccountId || null,
+          destinationCalendar: conn.destinationCalendar || conn.calendarId || 'primary',
+          calendars: []
+        };
+        
+        try {
+          const cals = await calendarService.fetchUserCalendars(userId, conn.id);
+          state[provider].calendars = cals || [];
+        } catch (err: any) {
+          console.error(`[getCalendarState] Failed to fetch calendars for ${provider}:`, err?.message);
+        }
+      }
+    }
+  } catch (err: any) {
+    console.error('[getCalendarState Error]:', err?.message);
+  }
+
+  return state;
+}
+
 export async function fetchConnectionCalendars(connectionId: string) {
   const { userId } = await auth();
   if (!userId) throw new Error('AUTH_EXPIRED');
