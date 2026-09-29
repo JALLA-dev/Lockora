@@ -63,6 +63,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(authUrl);
   } catch (err: any) {
     console.error('[Outlook Connect Error]:', err?.message);
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=server_error`);
+    const safeErrorMsg = encodeURIComponent(err?.message?.substring(0, 100) || 'unknown');
+    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=server_error&details=${safeErrorMsg}`);
   }
 }
