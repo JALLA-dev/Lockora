@@ -24,12 +24,12 @@ export async function getLockoraUser() {
 
 export async function updateUsername(username: string) {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) return { error: 'Unauthorized' };
   
   // Format the username: lowercase, no spaces or special chars
   const sanitizedUsername = username.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
   if (!sanitizedUsername) {
-    throw new Error('Invalid username format');
+    return { error: 'Invalid username format' };
   }
 
   try {
@@ -44,8 +44,9 @@ export async function updateUsername(username: string) {
     return { success: true, username: sanitizedUsername };
   } catch (err: any) {
     if (err.code === '23505') {
-      throw new Error('This username is already taken. Please choose another one.');
+      return { error: 'This username is already taken. Please choose another one.' };
     }
-    throw err;
+    console.error('[updateUsername] Error:', err?.message);
+    return { error: 'An unexpected error occurred while saving the username.' };
   }
 }

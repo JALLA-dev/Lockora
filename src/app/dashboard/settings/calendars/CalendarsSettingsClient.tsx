@@ -25,7 +25,9 @@ export function CalendarsSettingsClient({
     setUsernameSuccess(false);
     try {
       const res = await updateUsername(username);
-      if (res.success) {
+      if (res?.error) {
+        alert(res.error);
+      } else if (res?.success) {
         setUsernameSuccess(true);
         setTimeout(() => setUsernameSuccess(false), 3000);
       }
