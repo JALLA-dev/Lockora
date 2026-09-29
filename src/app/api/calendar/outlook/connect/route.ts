@@ -58,6 +58,7 @@ export async function GET(request: Request) {
       createdAt: now,
     });
 
+    const provider = new OutlookCalendarProvider();
     const authUrl = provider.getAuthUrl(stateId, redirectUri);
     return NextResponse.redirect(authUrl);
   } catch (err: any) {
