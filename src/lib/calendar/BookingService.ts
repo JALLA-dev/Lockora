@@ -298,4 +298,122 @@ export class BookingService {
 
     return { success: true };
   }
+
+  /**
+   * Gets booking details securely via token.
+   */
+  static async getBookingByToken(secureToken: string) {
+    const [bookingData] = await db
+      .select({
+        booking: bookings,
+        meetingType: meetingTypes,
+        user: users,
+      })
+      .from(bookings)
+      .innerJoin(meetingTypes, eq(bookings.meetingTypeId, meetingTypes.id))
+      .innerJoin(users, eq(bookings.userId, users.id))
+      .where(eq(bookings.secureToken, secureToken));
+
+    return bookingData || null;
+  }
+
+  /**
+   * Cancels a booking via the visitor's secure token.
+   */
+  static async cancelBookingByToken(secureToken: string, reason?: string) {
+    const bookingData = await this.getBookingByToken(secureToken);
+    if (!bookingData) throw new Error('Invalid or expired booking token');
+
+    return this.cancelBooking(bookingData.booking.userId, bookingData.booking.id, reason || 'Cancelled by visitor');
+  }
+
+  /**
+   * Reschedules a booking via token.
+   */
+  static async rescheduleBookingByToken(secureToken: string, newStartTimeIso: string) {
+    const bookingData = await this.getBookingByToken(secureToken);
+    if (!bookingData) throw new Error('Invalid or expired booking token');
+    if (bookingData.booking.status !== 'CONFIRMED') throw new Error('Cannot reschedule a cancelled or completed booking');
+
+    const newStart = new Date(newStartTimeIso);
+    const newEnd = new Date(newStart.getTime() + bookingData.meetingType.durationMinutes * 60 * 1000);
+
+    // 1. Double booking checks (for simplicity, we skip full AvailabilityService logic in MVP)
+    const conflictingBookings = await db
+      .select()
+      .from(bookings)
+      .where(
+        and(
+          eq(bookings.userId, bookingData.booking.userId),
+          eq(bookings.status, 'CONFIRMED'),
+          gte(bookings.endTime, newStart),
+          lte(bookings.startTime, newEnd)
+        )
+      );
+
+    // Filter out the current booking from conflicts
+    const realConflicts = conflictingBookings.filter(b => b.id !== bookingData.booking.id);
+    if (realConflicts.length > 0) {
+      throw new Error('The selected time slot is no longer available. Please select another slot.');
+    }
+
+    // Check Outlook external calendar
+    const externalBusy = await calendarService.fetchFreeBusy(
+      bookingData.booking.userId,
+      newStart,
+      newEnd
+    );
+
+    const hasExternalConflict = externalBusy.some((busy) => {
+      return newStart.getTime() < busy.end.getTime() && newEnd.getTime() > busy.start.getTime();
+    });
+
+    if (hasExternalConflict) {
+      throw new Error('The selected time slot is no longer available in the host calendar.');
+    }
+
+    const timestamp = new Date();
+
+    // Update Lockora booking
+    await db
+      .update(bookings)
+      .set({
+        startTime: newStart,
+        endTime: newEnd,
+        updatedAt: timestamp,
+      })
+      .where(eq(bookings.id, bookingData.booking.id));
+
+    // Update External Provider
+    if (bookingData.booking.externalEventId) {
+      try {
+        await calendarService.rescheduleBookingEvent(
+          bookingData.booking.userId,
+          bookingData.booking.connectionId,
+          bookingData.booking.externalEventId,
+          newStart,
+          newEnd
+        );
+      } catch (err: any) {
+        console.error('Failed to reschedule on calendar provider:', err?.message);
+      }
+    }
+
+    // Send email alert
+    try {
+      await emailService.sendSecurityAlert({
+        to: bookingData.booking.visitorEmail,
+        event: 'BOOKING_CONFIRMED' as any,
+        serviceName: bookingData.meetingType.title,
+        actionName: 'Booking Rescheduled',
+        userName: bookingData.booking.visitorName,
+        time: timestamp,
+        details: `Your booking has been successfully rescheduled to ${newStart.toUTCString()}.`,
+      });
+    } catch {
+      // ignore
+    }
+
+    return { success: true };
+  }
 }

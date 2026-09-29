@@ -80,3 +80,25 @@ export async function getPublicEventType(username: string, slug: string) {
     return null;
   }
 }
+
+import { BookingService } from '@/lib/calendar/BookingService';
+
+export async function cancelPublicBooking(token: string, reason: string) {
+  try {
+    await BookingService.cancelBookingByToken(token, reason);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[cancelPublicBooking Error]:', err?.message);
+    return { error: err?.message || 'Failed to cancel booking' };
+  }
+}
+
+export async function reschedulePublicBooking(token: string, newStartTimeIso: string) {
+  try {
+    await BookingService.rescheduleBookingByToken(token, newStartTimeIso);
+    return { success: true };
+  } catch (err: any) {
+    console.error('[reschedulePublicBooking Error]:', err?.message);
+    return { error: err?.message || 'Failed to reschedule booking' };
+  }
+}

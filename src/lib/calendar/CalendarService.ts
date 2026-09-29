@@ -150,6 +150,26 @@ export class CalendarService {
       externalEventId
     );
   }
+
+  async rescheduleBookingEvent(
+    userId: string,
+    connectionId: string | null,
+    externalEventId: string,
+    newStart: Date,
+    newEnd: Date
+  ): Promise<boolean> {
+    if (!externalEventId) return false;
+    const validConn = await this.getValidConnection(userId, connectionId || undefined);
+    if (!validConn) return false;
+
+    return validConn.provider.rescheduleEvent(
+      validConn.accessToken,
+      validConn.connection.destinationCalendar || validConn.connection.calendarId,
+      externalEventId,
+      newStart,
+      newEnd
+    );
+  }
 }
 
 export const calendarService = new CalendarService();
