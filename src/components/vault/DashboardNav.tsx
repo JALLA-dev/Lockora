@@ -7,11 +7,12 @@ import { UserButton } from '@clerk/nextjs';
 import { useVault } from '@/components/vault/VaultProvider';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { useState } from 'react';
-import { Shield, PlusCircle, Settings, FileText, Lock, Menu } from 'lucide-react';
+import { Shield, PlusCircle, Settings, FileText, Lock, Menu, Calendar } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const navItems = [
   { href: '/dashboard', label: 'My Lockora', icon: Shield },
+  { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
   { href: '/dashboard/secrets/new', label: 'Add Secret', icon: PlusCircle },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/audit', label: 'Audit Logs', icon: FileText },

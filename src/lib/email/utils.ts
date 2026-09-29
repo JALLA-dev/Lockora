@@ -14,7 +14,10 @@ export type LockoraSecurityEventType =
   | 'SECRET_EXPIRY_REMINDER'
   | 'SECRET_EXPIRED'
   | 'ROTATION_REMINDER'
-  | 'SECURITY_EVENT';
+  | 'SECURITY_EVENT'
+  | 'BOOKING_CONFIRMED'
+  | 'BOOKING_CANCELLED'
+  | 'CALENDAR_CONNECTED';
 
 export interface SecurityEventConfig {
   subject: string;
@@ -102,6 +105,21 @@ export const EVENT_CONFIGS: Record<LockoraSecurityEventType, SecurityEventConfig
     subject: 'Lockora Security Alert — Security Event Recorded',
     summary: 'A security event was recorded in your Lockora account.',
     action: 'Security Event',
+  },
+  BOOKING_CONFIRMED: {
+    subject: 'Lockora Calendar — Booking Confirmed',
+    summary: 'Your meeting reservation has been confirmed successfully.',
+    action: 'Booking Confirmed',
+  },
+  BOOKING_CANCELLED: {
+    subject: 'Lockora Calendar — Booking Cancelled',
+    summary: 'A calendar booking has been cancelled.',
+    action: 'Booking Cancelled',
+  },
+  CALENDAR_CONNECTED: {
+    subject: 'Lockora Security Alert — Calendar Connected',
+    summary: 'A new external calendar provider was connected to your Lockora account.',
+    action: 'Calendar Connected',
   },
 };
 

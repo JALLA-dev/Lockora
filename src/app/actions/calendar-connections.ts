@@ -1,0 +1,61 @@
+'use server';
+
+import { auth } from '@clerk/nextjs/server';
+import { db } from '@/db';
+import { calendarConnections, auditLogs } from '@/db/schema';
+import { eq, and, desc } from 'drizzle-orm';
+import crypto from 'crypto';
+
+export async function getCalendarConnections() {
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const connections = await db
+    .select({
+      id: calendarConnections.id,
+      provider: calendarConnections.provider,
+      providerAccountId: calendarConnections.providerAccountId,
+      calendarId: calendarConnections.calendarId,
+      status: calendarConnections.status,
+      tokenExpiresAt: calendarConnections.tokenExpiresAt,
+      createdAt: calendarConnections.createdAt,
+      updatedAt: calendarConnections.updatedAt,
+    })
+    .from(calendarConnections)
+    .where(eq(calendarConnections.userId, userId))
+    .orderBy(desc(calendarConnections.createdAt));
+
+  return connections;
+}
+
+export async function disconnectCalendar(connectionId: string) {
+  const { userId } = await auth();
+  if (!userId) throw new Error('Unauthorized');
+
+  const timestamp = new Date();
+
+  await db
+    .update(calendarConnections)
+    .set({
+      status: 'REVOKED',
+      revokedAt: timestamp,
+      updatedAt: timestamp,
+    })
+    .where(
+      and(
+        eq(calendarConnections.id, connectionId),
+        eq(calendarConnections.userId, userId)
+      )
+    );
+
+  await db.insert(auditLogs).values({
+    id: crypto.randomUUID(),
+    userId,
+    action: 'CALENDAR_DISCONNECTED',
+    resource: connectionId,
+    result: 'SUCCESS',
+    timestamp,
+  });
+
+  return { success: true };
+}
