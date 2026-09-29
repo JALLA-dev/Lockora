@@ -23,6 +23,7 @@ export async function getCalendarConnections() {
         provider: calendarConnections.provider,
         providerAccountId: calendarConnections.providerAccountId,
         calendarId: calendarConnections.calendarId,
+        destinationCalendar: calendarConnections.destinationCalendar,
         calendarEmail: calendarConnections.calendarEmail,
         status: calendarConnections.status,
         tokenExpiresAt: calendarConnections.tokenExpiresAt,
@@ -30,7 +31,7 @@ export async function getCalendarConnections() {
         updatedAt: calendarConnections.updatedAt,
       })
       .from(calendarConnections)
-      .where(and(eq(calendarConnections.userId, userId), eq(calendarConnections.provider, 'microsoft')))
+      .where(eq(calendarConnections.userId, userId))
       .orderBy(desc(calendarConnections.createdAt));
 
     return connections || [];
@@ -57,7 +58,7 @@ export async function updateSelectedCalendar(connectionId: string, calendarId: s
   await db
     .update(calendarConnections)
     .set({
-      calendarId,
+      destinationCalendar: calendarId, // Using the new destination field
       updatedAt: timestamp,
     })
     .where(
@@ -95,7 +96,7 @@ export async function disconnectCalendar(connectionId: string) {
     id: crypto.randomUUID(),
     userId,
     action: 'CALENDAR_DISCONNECTED',
-    resource: 'MICROSOFT_OUTLOOK',
+    resource: 'CALENDAR_PROVIDER',
     result: 'SUCCESS',
     timestamp,
   });

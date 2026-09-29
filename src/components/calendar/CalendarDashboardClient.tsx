@@ -15,7 +15,9 @@ import {
   AlertTriangle,
   RefreshCw,
   LogOut,
-  ExternalLink,
+  Settings,
+  Plus,
+  Link as LinkIcon
 } from 'lucide-react';
 
 export type CalendarErrorState =
@@ -46,8 +48,9 @@ export function CalendarDashboardClient({
   const [bookings, setBookings] = useState(initialBookings);
   const [errorState, setErrorState] = useState<CalendarErrorState>(initialError);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
-  const activeConnCount = (connections || []).filter((c) => c.provider === 'microsoft' && c.status === 'ACTIVE').length;
+  const activeConnCount = (connections || []).filter((c) => c.status === 'ACTIVE').length;
   const activeBookingsCount = (bookings || []).filter((b) => b.status === 'CONFIRMED').length;
 
   const handleRetry = async () => {
@@ -91,7 +94,6 @@ export function CalendarDashboardClient({
     }
   };
 
-  // State-specific error views
   if (errorState) {
     let title = 'Unable to load Calendar';
     let description = 'Unable to load Calendar. Please try again.';
@@ -104,8 +106,8 @@ export function CalendarDashboardClient({
       icon = <LogOut className="w-8 h-8 text-red-500" />;
       showAuthBtn = true;
     } else if (errorState === 'CONFIG_ERROR') {
-      title = 'Outlook Calendar Not Configured';
-      description = 'Outlook Calendar is not configured. Please contact the administrator.';
+      title = 'Calendar Provider Not Configured';
+      description = 'OAuth provider is not configured. Please contact the administrator.';
       icon = <AlertTriangle className="w-8 h-8 text-amber-500" />;
     } else if (errorState === 'PROVIDER_UNAVAILABLE') {
       title = 'Service Temporarily Unavailable';
@@ -122,7 +124,6 @@ export function CalendarDashboardClient({
           <h2 className="text-xl font-bold text-zinc-900 dark:text-white">{title}</h2>
           <p className="text-xs text-zinc-600 dark:text-zinc-400 mt-1">{description}</p>
         </div>
-
         <div className="flex items-center gap-3 pt-2 w-full">
           {showAuthBtn ? (
             <a
@@ -146,16 +147,35 @@ export function CalendarDashboardClient({
     );
   }
 
+  if (showSettings) {
+    return (
+      <div className="space-y-6 max-w-6xl mx-auto">
+        <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-5">
+          <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
+            <Settings className="w-7 h-7 text-indigo-500" /> Settings: Calendar Connections
+          </h1>
+          <button
+            onClick={() => setShowSettings(false)}
+            className="text-sm font-medium text-indigo-600 dark:text-indigo-400 hover:underline"
+          >
+            &larr; Back to Scheduling
+          </button>
+        </div>
+        <CalendarConnectionManager connections={connections} />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Header Banner */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-zinc-200 dark:border-zinc-800 pb-5">
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-white flex items-center gap-2">
-            <Calendar className="w-7 h-7 text-indigo-500" /> Lockora Calendar
+            <Calendar className="w-7 h-7 text-indigo-500" /> Scheduling
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-            Secure scheduling & Microsoft Outlook calendar sync.
+            Create event types, share booking links, and manage your availability.
           </p>
         </div>
 
@@ -165,13 +185,7 @@ export function CalendarDashboardClient({
             href="/dashboard/calendar/availability"
             className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors"
           >
-            <Clock className="w-3.5 h-3.5 text-indigo-500" /> Working Hours
-          </Link>
-          <Link
-            href="/dashboard/calendar/meeting-types"
-            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors"
-          >
-            <Video className="w-3.5 h-3.5 text-indigo-500" /> Meeting Types
+            <Clock className="w-3.5 h-3.5 text-indigo-500" /> Availability
           </Link>
           <Link
             href="/dashboard/calendar/bookings"
@@ -179,54 +193,92 @@ export function CalendarDashboardClient({
           >
             <ListOrdered className="w-3.5 h-3.5 text-indigo-500" /> Bookings ({activeBookingsCount})
           </Link>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="flex items-center gap-1.5 text-xs font-semibold px-3 py-2 rounded-lg bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 text-zinc-800 dark:text-zinc-200 transition-colors"
+          >
+            <Settings className="w-3.5 h-3.5 text-zinc-500" /> Calendar Connections
+          </button>
         </div>
       </div>
 
-      {/* Zero Connection State Banner */}
       {activeConnCount === 0 && (
-        <div className="p-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+        <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <h3 className="font-semibold text-zinc-900 dark:text-white text-sm flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-indigo-500" /> Connect your calendar to start accepting bookings
+            <h3 className="font-semibold text-amber-900 dark:text-amber-500 text-sm flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" /> No Calendar Connected
             </h3>
-            <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              Connect Microsoft Outlook Calendar to enable automated visitor scheduling.
+            <p className="text-xs text-amber-700 dark:text-amber-400">
+              You must connect a Google or Microsoft calendar in Settings to accept bookings.
             </p>
           </div>
-          <a
-            href="/api/calendar/outlook/connect"
-            className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+          <button
+            onClick={() => setShowSettings(true)}
+            className="text-xs font-semibold bg-amber-600 hover:bg-amber-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
           >
-            <ExternalLink className="w-3.5 h-3.5" /> Connect Outlook Calendar
-          </a>
+            Go to Settings
+          </button>
         </div>
       )}
 
-      {/* Metrics Row */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Outlook Connection</p>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-            {activeConnCount === 0 ? 'None' : 'Connected'}
-          </p>
-          <p className="text-[11px] text-zinc-500 mt-1">Microsoft Graph OAuth</p>
+      {/* Event Types Section */}
+      <div className="space-y-4">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Event Types</h2>
+          <Link
+            href="/dashboard/calendar/meeting-types/new"
+            className="flex items-center gap-1.5 text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors shadow-sm"
+          >
+            <Plus className="w-4 h-4" /> New Event Type
+          </Link>
         </div>
 
-        <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Meeting Types</p>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{meetingTypes.length}</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Active Public Booking Pages</p>
-        </div>
+        {meetingTypes.length === 0 ? (
+          <div className="py-12 border-2 border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl text-center">
+            <Video className="w-10 h-10 text-zinc-400 mx-auto mb-3" />
+            <h3 className="text-sm font-semibold text-zinc-900 dark:text-white">No Event Types</h3>
+            <p className="text-xs text-zinc-500 mt-1 max-w-xs mx-auto">
+              Create your first event type to let people book time with you.
+            </p>
+            <Link
+              href="/dashboard/calendar/meeting-types/new"
+              className="inline-flex items-center gap-2 mt-4 text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+            >
+              <Plus className="w-3.5 h-3.5" /> Create Event Type
+            </Link>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {meetingTypes.map((type) => (
+              <div key={type.id} className="p-5 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900/50 flex flex-col justify-between shadow-sm hover:shadow-md transition-shadow">
+                <div>
+                  <div className="flex justify-between items-start mb-2">
+                    <h3 className="font-bold text-zinc-900 dark:text-white">{type.title}</h3>
+                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider ${type.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/20 dark:text-emerald-400' : 'bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400'}`}>
+                      {type.isActive ? 'Active' : 'Inactive'}
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-500 mb-4">{type.durationMinutes} mins • {type.locationType === 'teams' ? 'Microsoft Teams' : type.locationType === 'meet' ? 'Google Meet' : 'Custom Location'}</p>
+                  
+                  <div className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-50 dark:bg-indigo-500/10 p-2 rounded-lg truncate">
+                    <LinkIcon className="w-3.5 h-3.5 shrink-0" />
+                    <span className="truncate">/book/you/{type.slug}</span>
+                  </div>
+                </div>
 
-        <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Scheduled Bookings</p>
-          <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">{activeBookingsCount}</p>
-          <p className="text-[11px] text-zinc-500 mt-1">Confirmed Visitor Meetings</p>
-        </div>
+                <div className="mt-5 flex items-center gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
+                  <Link href={`/dashboard/calendar/meeting-types/${type.id}`} className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                    Edit
+                  </Link>
+                  <button className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                    Copy Link
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
-
-      {/* Connection Manager */}
-      <CalendarConnectionManager connections={connections} />
     </div>
   );
 }
