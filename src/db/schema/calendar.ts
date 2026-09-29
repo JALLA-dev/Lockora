@@ -12,15 +12,17 @@ import { pgTable, text, timestamp, integer, boolean, jsonb } from 'drizzle-orm/p
 export const calendarConnections = pgTable('calendar_connections', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
-  provider: text('provider').notNull(), // 'microsoft'
+  provider: text('provider').notNull(), // 'microsoft' | 'google'
   providerAccountId: text('provider_account_id').notNull(),
   calendarId: text('calendar_id').notNull(),
-  calendarEmail: text('calendar_email'), // Display-only: Microsoft account email
+  calendarEmail: text('calendar_email'), // Display-only: Microsoft/Google account email
   encryptedAccessToken: text('encrypted_access_token').notNull(),
   encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
   tokenExpiresAt: timestamp('token_expires_at').notNull(),
   scopes: text('scopes').notNull(), // JSON string array
   status: text('status').default('ACTIVE').notNull(), // 'ACTIVE' | 'EXPIRED' | 'REVOKED'
+  selectedCalendars: text('selected_calendars'), // JSON array of calendar IDs to check for conflicts
+  destinationCalendar: text('destination_calendar'), // Calendar ID to create bookings in
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
   revokedAt: timestamp('revoked_at'),

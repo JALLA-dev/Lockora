@@ -35,6 +35,8 @@ export async function ensureCalendarTablesExist() {
         "token_expires_at" timestamp NOT NULL,
         "scopes" text NOT NULL,
         "status" text DEFAULT 'ACTIVE' NOT NULL,
+        "selected_calendars" text,
+        "destination_calendar" text,
         "created_at" timestamp NOT NULL,
         "updated_at" timestamp NOT NULL,
         "revoked_at" timestamp
@@ -113,11 +115,12 @@ export async function ensureCalendarTablesExist() {
     `);
 
     // Idempotent column additions for existing deployments
-    // Add calendar_email if not yet present
     await db.execute(sql`
       ALTER TABLE "calendar_connections"
-        ADD COLUMN IF NOT EXISTS "calendar_email" text;
-    `).catch(() => { /* column may already exist */ });
+        ADD COLUMN IF NOT EXISTS "calendar_email" text,
+        ADD COLUMN IF NOT EXISTS "selected_calendars" text,
+        ADD COLUMN IF NOT EXISTS "destination_calendar" text;
+    `).catch(() => { /* columns may already exist */ });
 
     // Clean up expired OAuth states
     await db.execute(sql`

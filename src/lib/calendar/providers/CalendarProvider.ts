@@ -8,7 +8,7 @@ import {
 } from '../types';
 
 export interface CalendarProvider {
-  readonly providerName: 'outlook';
+  readonly providerName: 'outlook' | 'google';
 
   isConfigured(): boolean;
 
