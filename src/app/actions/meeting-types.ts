@@ -27,37 +27,66 @@ export async function getMeetingTypes() {
   }
 }
 
+export async function getMeetingTypeById(id: string) {
+  const { userId } = await auth();
+  if (!userId) throw new Error('AUTH_EXPIRED');
+
+  try {
+    await ensureCalendarTablesExist();
+
+    const [type] = await db
+      .select()
+      .from(meetingTypes)
+      .where(and(eq(meetingTypes.id, id), eq(meetingTypes.userId, userId)));
+
+    return type || null;
+  } catch (err: any) {
+    console.error('[getMeetingTypeById Error]:', err?.message);
+    return null;
+  }
+}
+
 export async function createMeetingType(data: {
   title: string;
   slug?: string;
   description?: string;
   durationMinutes: number;
-  locationType: 'teams' | 'custom';
+  locationType: string;
   locationUrl?: string;
+  isActive?: boolean;
 }) {
   const { userId } = await auth();
   if (!userId) throw new Error('AUTH_EXPIRED');
 
   await ensureCalendarTablesExist();
   const timestamp = new Date();
-  const rawSlug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
-  const slug = `${rawSlug}-${crypto.randomBytes(3).toString('hex')}`;
+  
+  // Use provided slug or generate one
+  let slug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)+/g, '');
+  if (!slug) slug = `meeting-${crypto.randomBytes(3).toString('hex')}`;
 
   const newId = crypto.randomUUID();
 
-  await db.insert(meetingTypes).values({
-    id: newId,
-    userId,
-    title: data.title,
-    slug,
-    description: data.description || null,
-    durationMinutes: data.durationMinutes || 30,
-    locationType: data.locationType || 'teams',
-    locationUrl: data.locationUrl || null,
-    isActive: true,
-    createdAt: timestamp,
-    updatedAt: timestamp,
-  });
+  try {
+    await db.insert(meetingTypes).values({
+      id: newId,
+      userId,
+      title: data.title,
+      slug,
+      description: data.description || null,
+      durationMinutes: data.durationMinutes || 30,
+      locationType: data.locationType || 'teams',
+      locationUrl: data.locationUrl || null,
+      isActive: data.isActive ?? true,
+      createdAt: timestamp,
+      updatedAt: timestamp,
+    });
+  } catch (err: any) {
+    if (err.code === '23505') {
+      throw new Error('A meeting type with this URL slug already exists.');
+    }
+    throw err;
+  }
 
   await db.insert(auditLogs).values({
     id: crypto.randomUUID(),
@@ -69,6 +98,54 @@ export async function createMeetingType(data: {
   });
 
   return { success: true, id: newId, slug };
+}
+
+export async function updateMeetingType(id: string, data: {
+  title: string;
+  slug: string;
+  description?: string;
+  durationMinutes: number;
+  locationType: string;
+  locationUrl?: string;
+  isActive?: boolean;
+}) {
+  const { userId } = await auth();
+  if (!userId) throw new Error('AUTH_EXPIRED');
+
+  await ensureCalendarTablesExist();
+  const timestamp = new Date();
+
+  try {
+    await db
+      .update(meetingTypes)
+      .set({
+        title: data.title,
+        slug: data.slug,
+        description: data.description || null,
+        durationMinutes: data.durationMinutes,
+        locationType: data.locationType,
+        locationUrl: data.locationUrl || null,
+        isActive: data.isActive ?? true,
+        updatedAt: timestamp,
+      })
+      .where(and(eq(meetingTypes.id, id), eq(meetingTypes.userId, userId)));
+  } catch (err: any) {
+    if (err.code === '23505') {
+      throw new Error('A meeting type with this URL slug already exists.');
+    }
+    throw err;
+  }
+
+  await db.insert(auditLogs).values({
+    id: crypto.randomUUID(),
+    userId,
+    action: 'MEETING_TYPE_UPDATED',
+    resource: id,
+    result: 'SUCCESS',
+    timestamp,
+  });
+
+  return { success: true };
 }
 
 export async function toggleMeetingTypeStatus(id: string, isActive: boolean) {

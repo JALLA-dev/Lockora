@@ -4,9 +4,9 @@ import Image from 'next/image';
 export default async function PublicBookingPage({
   params,
 }: {
-  params: Promise<{ slug: string }>;
+  params: Promise<{ username: string; slug: string }>;
 }) {
-  const { slug } = await params;
+  const { username, slug } = await params;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-zinc-900 via-zinc-950 to-black text-white p-4 md:p-10 flex flex-col justify-between relative overflow-hidden">
