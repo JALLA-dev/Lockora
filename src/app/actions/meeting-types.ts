@@ -32,7 +32,7 @@ export async function createMeetingType(data: {
   slug?: string;
   description?: string;
   durationMinutes: number;
-  locationType: 'google_meet' | 'teams' | 'custom';
+  locationType: 'teams' | 'custom';
   locationUrl?: string;
 }) {
   const { userId } = await auth();
@@ -52,7 +52,7 @@ export async function createMeetingType(data: {
     slug,
     description: data.description || null,
     durationMinutes: data.durationMinutes || 30,
-    locationType: data.locationType || 'google_meet',
+    locationType: data.locationType || 'teams',
     locationUrl: data.locationUrl || null,
     isActive: true,
     createdAt: timestamp,

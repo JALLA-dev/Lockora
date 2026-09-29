@@ -73,7 +73,7 @@ export async function GET(
     const dayStartUtc = TimeZoneService.getUtcDateFromZoneTime(dateStr, '00:00', userRules.timeZone);
     const dayEndUtc = TimeZoneService.getUtcDateFromZoneTime(dateStr, '23:59', userRules.timeZone);
 
-    // 4. Fetch External Busy Slots from Google/Outlook
+    // 4. Fetch External Busy Slots from Microsoft Outlook via Graph
     const externalBusySlots = await calendarService.fetchFreeBusy(userId, dayStartUtc, dayEndUtc);
 
     // 5. Fetch Existing Lockora Bookings for day

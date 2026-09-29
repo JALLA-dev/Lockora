@@ -1,11 +1,21 @@
 import { pgTable, text, timestamp, integer, boolean, jsonb } from 'drizzle-orm/pg-core';
 
+/**
+ * Calendar Connections
+ * Belongs to a Lockora user (via Clerk userId).
+ * The calendarEmail is the Microsoft account email returned by Graph /me.
+ * It is stored only for display purposes — it is NEVER used as a lookup key
+ * for calendar ownership. Ownership is always determined by userId (Clerk ID).
+ *
+ * provider is always 'microsoft' — Google Calendar is NOT supported.
+ */
 export const calendarConnections = pgTable('calendar_connections', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull(),
-  provider: text('provider').notNull(), // 'google' | 'outlook'
+  provider: text('provider').notNull(), // 'microsoft'
   providerAccountId: text('provider_account_id').notNull(),
   calendarId: text('calendar_id').notNull(),
+  calendarEmail: text('calendar_email'), // Display-only: Microsoft account email
   encryptedAccessToken: text('encrypted_access_token').notNull(),
   encryptedRefreshToken: text('encrypted_refresh_token').notNull(),
   tokenExpiresAt: timestamp('token_expires_at').notNull(),
@@ -14,6 +24,19 @@ export const calendarConnections = pgTable('calendar_connections', {
   createdAt: timestamp('created_at').notNull(),
   updatedAt: timestamp('updated_at').notNull(),
   revokedAt: timestamp('revoked_at'),
+});
+
+/**
+ * OAuth State table for CSRF protection.
+ * Each state is single-use: deleted after the callback validates it.
+ * States expire after 15 minutes.
+ */
+export const oauthStates = pgTable('oauth_states', {
+  id: text('id').primaryKey(), // the state value (random hex)
+  userId: text('user_id').notNull(), // Clerk user ID that initiated the flow
+  provider: text('provider').notNull(), // 'microsoft'
+  expiresAt: timestamp('expires_at').notNull(),
+  createdAt: timestamp('created_at').notNull(),
 });
 
 export const availabilityRules = pgTable('availability_rules', {
@@ -35,7 +58,7 @@ export const meetingTypes = pgTable('meeting_types', {
   slug: text('slug').notNull().unique(),
   description: text('description'),
   durationMinutes: integer('duration_minutes').default(30).notNull(),
-  locationType: text('location_type').default('google_meet').notNull(), // 'google_meet' | 'teams' | 'custom'
+  locationType: text('location_type').default('teams').notNull(), // 'teams' | 'custom'
   locationUrl: text('location_url'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').notNull(),

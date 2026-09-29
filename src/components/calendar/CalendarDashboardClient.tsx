@@ -47,7 +47,7 @@ export function CalendarDashboardClient({
   const [errorState, setErrorState] = useState<CalendarErrorState>(initialError);
   const [isRetrying, setIsRetrying] = useState(false);
 
-  const activeConnCount = (connections || []).filter((c) => c.status === 'ACTIVE').length;
+  const activeConnCount = (connections || []).filter((c) => c.provider === 'microsoft' && c.status === 'ACTIVE').length;
   const activeBookingsCount = (bookings || []).filter((b) => b.status === 'CONFIRMED').length;
 
   const handleRetry = async () => {

@@ -105,7 +105,7 @@ export class BookingService {
       throw new Error('The selected time slot is no longer available in the host calendar. Please choose another slot.');
     }
 
-    // 5. Create Calendar Event on Google/Outlook if connected
+    // 5. Create Calendar Event on Outlook if connected (Microsoft Graph)
     let meetingUrl = meetingType.locationUrl || undefined;
     let externalEventId: string | undefined = undefined;
     let connectionId: string | undefined = undefined;

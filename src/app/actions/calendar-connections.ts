@@ -23,13 +23,14 @@ export async function getCalendarConnections() {
         provider: calendarConnections.provider,
         providerAccountId: calendarConnections.providerAccountId,
         calendarId: calendarConnections.calendarId,
+        calendarEmail: calendarConnections.calendarEmail,
         status: calendarConnections.status,
         tokenExpiresAt: calendarConnections.tokenExpiresAt,
         createdAt: calendarConnections.createdAt,
         updatedAt: calendarConnections.updatedAt,
       })
       .from(calendarConnections)
-      .where(and(eq(calendarConnections.userId, userId), eq(calendarConnections.provider, 'outlook')))
+      .where(and(eq(calendarConnections.userId, userId), eq(calendarConnections.provider, 'microsoft')))
       .orderBy(desc(calendarConnections.createdAt));
 
     return connections || [];
@@ -94,7 +95,7 @@ export async function disconnectCalendar(connectionId: string) {
     id: crypto.randomUUID(),
     userId,
     action: 'CALENDAR_DISCONNECTED',
-    resource: connectionId,
+    resource: 'MICROSOFT_OUTLOOK',
     result: 'SUCCESS',
     timestamp,
   });

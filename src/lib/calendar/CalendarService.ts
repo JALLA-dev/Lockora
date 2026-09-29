@@ -31,7 +31,7 @@ export class CalendarService {
           and(
             eq(calendarConnections.id, connectionId),
             eq(calendarConnections.userId, userId),
-            eq(calendarConnections.provider, 'outlook'),
+            eq(calendarConnections.provider, 'microsoft'),
             eq(calendarConnections.status, 'ACTIVE')
           )
         );
@@ -43,7 +43,7 @@ export class CalendarService {
         .where(
           and(
             eq(calendarConnections.userId, userId),
-            eq(calendarConnections.provider, 'outlook'),
+            eq(calendarConnections.provider, 'microsoft'),
             eq(calendarConnections.status, 'ACTIVE')
           )
         );

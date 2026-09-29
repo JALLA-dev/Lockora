@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Calendar, CheckCircle2, RefreshCw, Trash2, ExternalLink, ShieldCheck } from 'lucide-react';
+import { Calendar, CheckCircle2, RefreshCw, Trash2, ExternalLink, ShieldCheck, Mail } from 'lucide-react';
 import {
   disconnectCalendar,
   fetchConnectionCalendars,
@@ -13,6 +13,7 @@ interface Connection {
   provider: string;
   providerAccountId: string;
   calendarId: string;
+  calendarEmail?: string | null;
   status: string;
   createdAt: Date;
 }
@@ -22,7 +23,11 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
   const [availableCalendars, setAvailableCalendars] = useState<any[]>([]);
   const [selectedCalId, setSelectedCalId] = useState<string>('primary');
 
-  const outlookConn = connections.find((c) => c.provider === 'outlook' && c.status === 'ACTIVE');
+  // Only show Microsoft Outlook connections — Google Calendar is not supported
+  const outlookConn = connections.find((c) => c.provider === 'microsoft' && c.status === 'ACTIVE');
+
+  // Display email: prefer calendarEmail (from Microsoft Graph /me), fall back to providerAccountId
+  const displayEmail = outlookConn?.calendarEmail || outlookConn?.providerAccountId || null;
 
   useEffect(() => {
     if (outlookConn) {
@@ -34,7 +39,7 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
           }
         })
         .catch(() => {
-          // ignore
+          // Non-fatal — fallback to primary calendar
         });
     }
   }, [outlookConn?.id]);
@@ -83,7 +88,7 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
                 </div>
                 <div>
                   <h3 className="font-semibold text-zinc-900 dark:text-white text-base">Microsoft Outlook Calendar</h3>
-                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Microsoft 365, Outlook.com & Work Accounts</p>
+                  <p className="text-xs text-zinc-500 dark:text-zinc-400">Microsoft 365, Outlook.com &amp; Work Accounts</p>
                 </div>
               </div>
               {outlookConn ? (
@@ -97,10 +102,14 @@ export function CalendarConnectionManager({ connections }: { connections: Connec
 
             {outlookConn && (
               <div className="space-y-3 my-4 bg-zinc-100 dark:bg-zinc-900/80 p-3.5 rounded-lg border border-zinc-200 dark:border-zinc-800">
-                <div className="flex items-center justify-between text-xs">
-                  <span className="text-zinc-500">Account:</span>
-                  <span className="font-mono font-medium text-zinc-900 dark:text-white">{outlookConn.providerAccountId}</span>
-                </div>
+                {displayEmail && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-zinc-500 flex items-center gap-1">
+                      <Mail className="w-3 h-3" /> Account:
+                    </span>
+                    <span className="font-mono font-medium text-zinc-900 dark:text-white">{displayEmail}</span>
+                  </div>
+                )}
 
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-zinc-500">Selected Calendar:</span>
