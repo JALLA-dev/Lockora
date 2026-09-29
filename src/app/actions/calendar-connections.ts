@@ -5,33 +5,44 @@ import { db } from '@/db';
 import { calendarConnections, auditLogs } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'crypto';
+import { ensureCalendarTablesExist } from '@/lib/calendar/db-init';
 
 export async function getCalendarConnections() {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) {
+    throw new Error('AUTH_EXPIRED');
+  }
 
-  const connections = await db
-    .select({
-      id: calendarConnections.id,
-      provider: calendarConnections.provider,
-      providerAccountId: calendarConnections.providerAccountId,
-      calendarId: calendarConnections.calendarId,
-      status: calendarConnections.status,
-      tokenExpiresAt: calendarConnections.tokenExpiresAt,
-      createdAt: calendarConnections.createdAt,
-      updatedAt: calendarConnections.updatedAt,
-    })
-    .from(calendarConnections)
-    .where(eq(calendarConnections.userId, userId))
-    .orderBy(desc(calendarConnections.createdAt));
+  try {
+    await ensureCalendarTablesExist();
 
-  return connections;
+    const connections = await db
+      .select({
+        id: calendarConnections.id,
+        provider: calendarConnections.provider,
+        providerAccountId: calendarConnections.providerAccountId,
+        calendarId: calendarConnections.calendarId,
+        status: calendarConnections.status,
+        tokenExpiresAt: calendarConnections.tokenExpiresAt,
+        createdAt: calendarConnections.createdAt,
+        updatedAt: calendarConnections.updatedAt,
+      })
+      .from(calendarConnections)
+      .where(eq(calendarConnections.userId, userId))
+      .orderBy(desc(calendarConnections.createdAt));
+
+    return connections || [];
+  } catch (err: any) {
+    console.error('[getCalendarConnections Error]:', err?.message);
+    return [];
+  }
 }
 
 export async function disconnectCalendar(connectionId: string) {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) throw new Error('AUTH_EXPIRED');
 
+  await ensureCalendarTablesExist();
   const timestamp = new Date();
 
   await db

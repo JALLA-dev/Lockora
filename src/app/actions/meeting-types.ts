@@ -5,18 +5,26 @@ import { db } from '@/db';
 import { meetingTypes, auditLogs } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'crypto';
+import { ensureCalendarTablesExist } from '@/lib/calendar/db-init';
 
 export async function getMeetingTypes() {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) throw new Error('AUTH_EXPIRED');
 
-  const types = await db
-    .select()
-    .from(meetingTypes)
-    .where(eq(meetingTypes.userId, userId))
-    .orderBy(desc(meetingTypes.createdAt));
+  try {
+    await ensureCalendarTablesExist();
 
-  return types;
+    const types = await db
+      .select()
+      .from(meetingTypes)
+      .where(eq(meetingTypes.userId, userId))
+      .orderBy(desc(meetingTypes.createdAt));
+
+    return types || [];
+  } catch (err: any) {
+    console.error('[getMeetingTypes Error]:', err?.message);
+    return [];
+  }
 }
 
 export async function createMeetingType(data: {
@@ -28,8 +36,9 @@ export async function createMeetingType(data: {
   locationUrl?: string;
 }) {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) throw new Error('AUTH_EXPIRED');
 
+  await ensureCalendarTablesExist();
   const timestamp = new Date();
   const rawSlug = data.slug || data.title.toLowerCase().replace(/[^a-z0-9]+/g, '-');
   const slug = `${rawSlug}-${crypto.randomBytes(3).toString('hex')}`;
@@ -64,8 +73,9 @@ export async function createMeetingType(data: {
 
 export async function toggleMeetingTypeStatus(id: string, isActive: boolean) {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) throw new Error('AUTH_EXPIRED');
 
+  await ensureCalendarTablesExist();
   await db
     .update(meetingTypes)
     .set({ isActive, updatedAt: new Date() })

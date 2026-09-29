@@ -5,36 +5,46 @@ import { db } from '@/db';
 import { availabilityRules, auditLogs } from '@/db/schema';
 import { eq } from 'drizzle-orm';
 import crypto from 'crypto';
+import { ensureCalendarTablesExist } from '@/lib/calendar/db-init';
+
+const DEFAULT_RULES = {
+  userId: '',
+  timeZone: 'UTC',
+  weeklyHours: {
+    mon: [{ start: '09:00', end: '17:00' }],
+    tue: [{ start: '09:00', end: '17:00' }],
+    wed: [{ start: '09:00', end: '17:00' }],
+    thu: [{ start: '09:00', end: '17:00' }],
+    fri: [{ start: '09:00', end: '17:00' }],
+    sat: [],
+    sun: [],
+  },
+  bufferMinutes: 15,
+  minNoticeMinutes: 120,
+  maxBookingDays: 30,
+};
 
 export async function getAvailabilityRules() {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) throw new Error('AUTH_EXPIRED');
 
-  const rules = await db
-    .select()
-    .from(availabilityRules)
-    .where(eq(availabilityRules.userId, userId));
+  try {
+    await ensureCalendarTablesExist();
 
-  if (rules.length === 0) {
-    return {
-      userId,
-      timeZone: 'UTC',
-      weeklyHours: {
-        mon: [{ start: '09:00', end: '17:00' }],
-        tue: [{ start: '09:00', end: '17:00' }],
-        wed: [{ start: '09:00', end: '17:00' }],
-        thu: [{ start: '09:00', end: '17:00' }],
-        fri: [{ start: '09:00', end: '17:00' }],
-        sat: [],
-        sun: [],
-      },
-      bufferMinutes: 15,
-      minNoticeMinutes: 120,
-      maxBookingDays: 30,
-    };
+    const rules = await db
+      .select()
+      .from(availabilityRules)
+      .where(eq(availabilityRules.userId, userId));
+
+    if (!rules || rules.length === 0) {
+      return { ...DEFAULT_RULES, userId };
+    }
+
+    return rules[0];
+  } catch (err: any) {
+    console.error('[getAvailabilityRules Error]:', err?.message);
+    return { ...DEFAULT_RULES, userId };
   }
-
-  return rules[0];
 }
 
 export async function updateAvailabilityRules(data: {
@@ -45,15 +55,16 @@ export async function updateAvailabilityRules(data: {
   maxBookingDays: number;
 }) {
   const { userId } = await auth();
-  if (!userId) throw new Error('Unauthorized');
+  if (!userId) throw new Error('AUTH_EXPIRED');
 
+  await ensureCalendarTablesExist();
   const timestamp = new Date();
   const existing = await db
     .select()
     .from(availabilityRules)
     .where(eq(availabilityRules.userId, userId));
 
-  if (existing.length > 0) {
+  if (existing && existing.length > 0) {
     await db
       .update(availabilityRules)
       .set({
