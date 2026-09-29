@@ -7,6 +7,7 @@ import { getCalendarConnections } from '@/app/actions/calendar-connections';
 import { getAvailabilityRules } from '@/app/actions/availability';
 import { getMeetingTypes } from '@/app/actions/meeting-types';
 import { getUserBookings } from '@/app/actions/bookings';
+import { updateUsername } from '@/app/actions/user';
 import {
   Calendar,
   Clock,
@@ -17,7 +18,10 @@ import {
   LogOut,
   Settings,
   Plus,
-  Link as LinkIcon
+  Link as LinkIcon,
+  User,
+  CheckCircle2,
+  Copy
 } from 'lucide-react';
 
 export type CalendarErrorState =
@@ -33,6 +37,7 @@ interface CalendarDashboardClientProps {
   initialMeetingTypes: any[];
   initialBookings: any[];
   initialError: CalendarErrorState;
+  initialUsername?: string | null;
 }
 
 export function CalendarDashboardClient({
@@ -41,6 +46,7 @@ export function CalendarDashboardClient({
   initialMeetingTypes,
   initialBookings,
   initialError,
+  initialUsername,
 }: CalendarDashboardClientProps) {
   const [connections, setConnections] = useState(initialConnections);
   const [rules, setRules] = useState(initialRules);
@@ -49,9 +55,13 @@ export function CalendarDashboardClient({
   const [errorState, setErrorState] = useState<CalendarErrorState>(initialError);
   const [isRetrying, setIsRetrying] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [username, setUsername] = useState(initialUsername || '');
+  const [isSavingUsername, setIsSavingUsername] = useState(false);
+  const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
   const activeConnCount = (connections || []).filter((c) => c.status === 'ACTIVE').length;
   const activeBookingsCount = (bookings || []).filter((b) => b.status === 'CONFIRMED').length;
+  const hasUsername = !!initialUsername;
 
   const handleRetry = async () => {
     setIsRetrying(true);
@@ -92,6 +102,31 @@ export function CalendarDashboardClient({
     } finally {
       setIsRetrying(false);
     }
+  };
+
+  const handleSaveUsername = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!username.trim()) return;
+    
+    setIsSavingUsername(true);
+    try {
+      const res = await updateUsername(username);
+      if (res.success) {
+        window.location.reload();
+      }
+    } catch (err: any) {
+      alert(err?.message || 'Failed to update username');
+    } finally {
+      setIsSavingUsername(false);
+    }
+  };
+
+  const copyPublicLink = (slug: string) => {
+    if (!initialUsername) return;
+    const url = `${window.location.origin}/book/${initialUsername}/${slug}`;
+    navigator.clipboard.writeText(url);
+    setCopiedSlug(slug);
+    setTimeout(() => setCopiedSlug(null), 2000);
   };
 
   if (errorState) {
@@ -161,6 +196,43 @@ export function CalendarDashboardClient({
             &larr; Back to Scheduling
           </button>
         </div>
+        
+        {/* Username Setting */}
+        <div className="bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
+          <div className="flex items-start gap-4">
+            <div className="p-3 bg-indigo-500/10 rounded-lg text-indigo-600 dark:text-indigo-400">
+              <User className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h3 className="font-semibold text-zinc-900 dark:text-white text-lg">Public Booking Profile</h3>
+              <p className="text-sm text-zinc-500 mb-4">Set your unique username for public booking links (e.g. lockora.com/book/your-name)</p>
+              
+              <form onSubmit={handleSaveUsername} className="flex gap-3 max-w-md">
+                <div className="flex-1 flex rounded-lg shadow-sm">
+                  <span className="inline-flex items-center px-3 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-500 text-sm">
+                    /book/
+                  </span>
+                  <input
+                    type="text"
+                    required
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ''))}
+                    placeholder="username"
+                    className="flex-1 min-w-0 rounded-none rounded-r-lg border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-white focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  disabled={isSavingUsername || username === initialUsername}
+                  className="px-4 py-2 text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg shadow-sm disabled:opacity-50"
+                >
+                  {isSavingUsername ? 'Saving...' : 'Save'}
+                </button>
+              </form>
+            </div>
+          </div>
+        </div>
+
         <CalendarConnectionManager connections={connections} />
       </div>
     );
@@ -202,7 +274,26 @@ export function CalendarDashboardClient({
         </div>
       </div>
 
-      {activeConnCount === 0 && (
+      {!hasUsername && (
+        <div className="p-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h3 className="font-semibold text-indigo-900 dark:text-indigo-400 text-sm flex items-center gap-2">
+              <User className="w-4 h-4" /> Setup Required
+            </h3>
+            <p className="text-xs text-indigo-700 dark:text-indigo-300">
+              Set up your public booking profile to create booking links.
+            </p>
+          </div>
+          <button
+            onClick={() => setShowSettings(true)}
+            className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            Set Username
+          </button>
+        </div>
+      )}
+
+      {hasUsername && activeConnCount === 0 && (
         <div className="p-5 rounded-xl border border-amber-500/20 bg-amber-500/5 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
             <h3 className="font-semibold text-amber-900 dark:text-amber-500 text-sm flex items-center gap-2">
@@ -222,7 +313,7 @@ export function CalendarDashboardClient({
       )}
 
       {/* Event Types Section */}
-      <div className="space-y-4">
+      <div className={`space-y-4 ${!hasUsername ? 'opacity-50 pointer-events-none grayscale' : ''}`}>
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-bold text-zinc-900 dark:text-white">Event Types</h2>
           <Link
@@ -260,18 +351,25 @@ export function CalendarDashboardClient({
                   </div>
                   <p className="text-xs text-zinc-500 mb-4">{type.durationMinutes} mins • {type.locationType === 'teams' ? 'Microsoft Teams' : type.locationType === 'meet' ? 'Google Meet' : 'Custom Location'}</p>
                   
-                  <div className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-50 dark:bg-indigo-500/10 p-2 rounded-lg truncate">
+                  <div className="flex items-center gap-2 text-xs text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-50 dark:bg-indigo-500/10 p-2 rounded-lg">
                     <LinkIcon className="w-3.5 h-3.5 shrink-0" />
-                    <span className="truncate">/book/you/{type.slug}</span>
+                    <span className="truncate">/book/{initialUsername}/{type.slug}</span>
                   </div>
                 </div>
 
                 <div className="mt-5 flex items-center gap-3 pt-4 border-t border-zinc-100 dark:border-zinc-800">
-                  <Link href={`/dashboard/calendar/meeting-types/${type.id}`} className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400">
+                  <Link href={`/dashboard/calendar/meeting-types/${type.id}`} className="flex-1 text-center py-2 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors">
                     Edit
                   </Link>
-                  <button className="text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:text-indigo-600 dark:hover:text-indigo-400">
-                    Copy Link
+                  <button 
+                    onClick={() => copyPublicLink(type.slug)}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-md bg-zinc-100 dark:bg-zinc-800 text-xs font-semibold text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
+                  >
+                    {copiedSlug === type.slug ? (
+                      <><CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> Copied</>
+                    ) : (
+                      <><Copy className="w-3.5 h-3.5" /> Copy Link</>
+                    )}
                   </button>
                 </div>
               </div>
