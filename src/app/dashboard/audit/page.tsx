@@ -1,5 +1,6 @@
 import { getAuditLogs } from '@/app/actions/audit';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { ClientDate } from '@/components/ui/ClientDate';
 
 export default async function AuditPage() {
   const logs = await getAuditLogs();
@@ -57,8 +58,8 @@ export default async function AuditPage() {
                     )}
                   </div>
                   <div className="text-right text-xs text-zinc-500 dark:text-zinc-400">
-                    <div>{new Date(log.timestamp).toISOString().split('T')[0]}</div>
-                    <div>{new Date(log.timestamp).toISOString().split('T')[1].substring(0, 8)} UTC</div>
+                    <div><ClientDate dateString={log.timestamp} format="date" /></div>
+                    <div><ClientDate dateString={log.timestamp} format="time" /></div>
                   </div>
                 </div>
               ))}
