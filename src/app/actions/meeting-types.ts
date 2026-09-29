@@ -54,6 +54,14 @@ export async function createMeetingType(data: {
   locationType: string;
   locationUrl?: string;
   isActive?: boolean;
+  isSecret?: boolean;
+  scheduleId?: string;
+  bufferBefore?: number;
+  bufferAfter?: number;
+  minNoticeMinutes?: number;
+  maxBookingDays?: number;
+  maxBookingsPerDay?: number | null;
+  questions?: any;
 }) {
   const { userId } = await auth();
   if (!userId) throw new Error('AUTH_EXPIRED');
@@ -78,6 +86,14 @@ export async function createMeetingType(data: {
       locationType: data.locationType || 'teams',
       locationUrl: data.locationUrl || null,
       isActive: data.isActive ?? true,
+      isSecret: data.isSecret ?? false,
+      scheduleId: data.scheduleId || null,
+      bufferBefore: data.bufferBefore || 0,
+      bufferAfter: data.bufferAfter || 0,
+      minNoticeMinutes: data.minNoticeMinutes || 120,
+      maxBookingDays: data.maxBookingDays || 30,
+      maxBookingsPerDay: data.maxBookingsPerDay || null,
+      questions: data.questions || null,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
@@ -108,6 +124,14 @@ export async function updateMeetingType(id: string, data: {
   locationType: string;
   locationUrl?: string;
   isActive?: boolean;
+  isSecret?: boolean;
+  scheduleId?: string;
+  bufferBefore?: number;
+  bufferAfter?: number;
+  minNoticeMinutes?: number;
+  maxBookingDays?: number;
+  maxBookingsPerDay?: number | null;
+  questions?: any;
 }) {
   const { userId } = await auth();
   if (!userId) throw new Error('AUTH_EXPIRED');
@@ -126,6 +150,14 @@ export async function updateMeetingType(id: string, data: {
         locationType: data.locationType,
         locationUrl: data.locationUrl || null,
         isActive: data.isActive ?? true,
+        isSecret: data.isSecret ?? false,
+        scheduleId: data.scheduleId || null,
+        bufferBefore: data.bufferBefore || 0,
+        bufferAfter: data.bufferAfter || 0,
+        minNoticeMinutes: data.minNoticeMinutes || 120,
+        maxBookingDays: data.maxBookingDays || 30,
+        maxBookingsPerDay: data.maxBookingsPerDay || null,
+        questions: data.questions || null,
         updatedAt: timestamp,
       })
       .where(and(eq(meetingTypes.id, id), eq(meetingTypes.userId, userId)));
