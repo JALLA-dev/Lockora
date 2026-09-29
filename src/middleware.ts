@@ -6,7 +6,6 @@ const isPublicRoute = createRouteMatcher([
   '/',
   '/booking(.*)',
   '/api/calendar/public(.*)',
-  '/api/calendar/google/callback(.*)',
   '/api/calendar/outlook/callback(.*)',
 ]);
 

@@ -10,14 +10,22 @@ export async function GET(request: Request) {
   }
 
   const url = new URL(request.url);
-  const redirectUri = `${url.origin}/api/calendar/outlook/callback`;
+  const redirectUri =
+    process.env.MICROSOFT_REDIRECT_URI || `${url.origin}/api/calendar/outlook/callback`;
 
   const nonce = crypto.randomBytes(16).toString('hex');
   const statePayload = JSON.stringify({ userId, nonce, ts: Date.now() });
   const state = Buffer.from(statePayload).toString('base64url');
 
   const provider = new OutlookCalendarProvider();
-  const authUrl = provider.getAuthUrl(state, redirectUri);
+  if (!provider.isConfigured()) {
+    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=config_error`);
+  }
 
-  return NextResponse.redirect(authUrl);
+  try {
+    const authUrl = provider.getAuthUrl(state, redirectUri);
+    return NextResponse.redirect(authUrl);
+  } catch (err: any) {
+    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=config_error`);
+  }
 }

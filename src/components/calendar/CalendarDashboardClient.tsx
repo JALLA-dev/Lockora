@@ -15,8 +15,6 @@ import {
   AlertTriangle,
   RefreshCw,
   LogOut,
-  ShieldCheck,
-  CheckCircle2,
   ExternalLink,
 } from 'lucide-react';
 
@@ -56,7 +54,6 @@ export function CalendarDashboardClient({
     setIsRetrying(true);
     setErrorState(null);
 
-    // Timeout protection: 10 seconds max
     const timeoutPromise = new Promise((_, reject) =>
       setTimeout(() => reject(new Error('TIMEOUT')), 10000)
     );
@@ -82,6 +79,8 @@ export function CalendarDashboardClient({
     } catch (err: any) {
       if (err?.message === 'AUTH_EXPIRED') {
         setErrorState('AUTH_EXPIRED');
+      } else if (err?.message === 'CONFIG_ERROR') {
+        setErrorState('CONFIG_ERROR');
       } else if (err?.message === 'TIMEOUT' || err?.message?.includes('network')) {
         setErrorState('PROVIDER_UNAVAILABLE');
       } else {
@@ -101,15 +100,15 @@ export function CalendarDashboardClient({
 
     if (errorState === 'AUTH_EXPIRED') {
       title = 'Session Expired';
-      description = 'Your session has expired. Please sign in again to access Lockora Calendar.';
+      description = 'Your session has expired. Please sign in again.';
       icon = <LogOut className="w-8 h-8 text-red-500" />;
       showAuthBtn = true;
     } else if (errorState === 'CONFIG_ERROR') {
-      title = 'Configuration Problem';
-      description = 'Calendar integration is not configured.';
+      title = 'Outlook Calendar Not Configured';
+      description = 'Outlook Calendar is not configured. Please contact the administrator.';
       icon = <AlertTriangle className="w-8 h-8 text-amber-500" />;
     } else if (errorState === 'PROVIDER_UNAVAILABLE') {
-      title = 'Service Unavailable';
+      title = 'Service Temporarily Unavailable';
       description = 'Calendar service is temporarily unavailable. Please try again.';
       icon = <AlertTriangle className="w-8 h-8 text-amber-500" />;
     }
@@ -156,7 +155,7 @@ export function CalendarDashboardClient({
             <Calendar className="w-7 h-7 text-indigo-500" /> Lockora Calendar
           </h1>
           <p className="text-sm text-zinc-600 dark:text-zinc-400 mt-1">
-            Secure scheduling & calendar sync powered by Lockora architecture.
+            Secure scheduling & Microsoft Outlook calendar sync.
           </p>
         </div>
 
@@ -183,42 +182,34 @@ export function CalendarDashboardClient({
         </div>
       </div>
 
-      {/* Zero Connection State Banner if no active connections */}
+      {/* Zero Connection State Banner */}
       {activeConnCount === 0 && (
         <div className="p-5 rounded-xl border border-indigo-500/20 bg-indigo-500/5 backdrop-blur-md flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div className="space-y-1">
             <h3 className="font-semibold text-zinc-900 dark:text-white text-sm flex items-center gap-2">
-              <Calendar className="w-4 h-4 text-indigo-500" /> No calendar connected
+              <Calendar className="w-4 h-4 text-indigo-500" /> Connect your calendar to start accepting bookings
             </h3>
             <p className="text-xs text-zinc-600 dark:text-zinc-400">
-              Connect your calendar to start accepting bookings automatically.
+              Connect Microsoft Outlook Calendar to enable automated visitor scheduling.
             </p>
           </div>
-          <div className="flex items-center gap-2 self-stretch md:self-auto">
-            <a
-              href="/api/calendar/google/connect"
-              className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <ExternalLink className="w-3.5 h-3.5" /> Connect Google Calendar
-            </a>
-            <a
-              href="/api/calendar/outlook/connect"
-              className="text-xs font-semibold bg-zinc-200 dark:bg-zinc-800 hover:bg-zinc-300 dark:hover:bg-zinc-700 text-zinc-900 dark:text-white px-3.5 py-2 rounded-lg transition-colors flex items-center gap-1.5"
-            >
-              <ExternalLink className="w-3.5 h-3.5" /> Connect Outlook Calendar
-            </a>
-          </div>
+          <a
+            href="/api/calendar/outlook/connect"
+            className="text-xs font-semibold bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 rounded-lg transition-colors flex items-center gap-1.5 shrink-0"
+          >
+            <ExternalLink className="w-3.5 h-3.5" /> Connect Outlook Calendar
+          </a>
         </div>
       )}
 
       {/* Metrics Row */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
         <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">
-          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Connected Calendars</p>
+          <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">Outlook Connection</p>
           <p className="text-2xl font-bold text-zinc-900 dark:text-white mt-1">
-            {activeConnCount === 0 ? 'None' : activeConnCount}
+            {activeConnCount === 0 ? 'None' : 'Connected'}
           </p>
-          <p className="text-[11px] text-zinc-500 mt-1">Google & Outlook OAuth</p>
+          <p className="text-[11px] text-zinc-500 mt-1">Microsoft Graph OAuth</p>
         </div>
 
         <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white/80 dark:bg-zinc-900/80 backdrop-blur-md">

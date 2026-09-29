@@ -5,6 +5,7 @@ import { db } from '@/db';
 import { calendarConnections, auditLogs } from '@/db/schema';
 import { encryptToken } from '@/lib/calendar/crypto';
 import crypto from 'crypto';
+import { ensureCalendarTablesExist } from '@/lib/calendar/db-init';
 
 export async function GET(request: Request) {
   const { userId: currentUserId } = await auth();
@@ -16,6 +17,7 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=missing_params`);
   }
 
+  // Validate state
   let stateUserId = '';
   try {
     const decoded = JSON.parse(Buffer.from(state, 'base64url').toString('utf8'));
@@ -32,10 +34,17 @@ export async function GET(request: Request) {
     return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=unauthorized`);
   }
 
-  const redirectUri = `${url.origin}/api/calendar/outlook/callback`;
+  const redirectUri =
+    process.env.MICROSOFT_REDIRECT_URI || `${url.origin}/api/calendar/outlook/callback`;
   const provider = new OutlookCalendarProvider();
 
+  if (!provider.isConfigured()) {
+    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=config_error`);
+  }
+
   try {
+    await ensureCalendarTablesExist();
+
     const tokens = await provider.exchangeCode(code, redirectUri);
     const encryptedAccess = encryptToken(tokens.accessToken);
     const encryptedRefresh = encryptToken(tokens.refreshToken);
@@ -69,7 +78,7 @@ export async function GET(request: Request) {
 
     return NextResponse.redirect(`${url.origin}/dashboard/calendar?connected=outlook`);
   } catch (err: any) {
-    console.error('Outlook OAuth Callback Error:', err?.message);
+    console.error('[Outlook OAuth Callback Error]:', err?.message);
     return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=auth_failed`);
   }
 }

@@ -6,6 +6,7 @@ import { calendarConnections, auditLogs } from '@/db/schema';
 import { eq, and, desc } from 'drizzle-orm';
 import crypto from 'crypto';
 import { ensureCalendarTablesExist } from '@/lib/calendar/db-init';
+import { calendarService } from '@/lib/calendar/CalendarService';
 
 export async function getCalendarConnections() {
   const { userId } = await auth();
@@ -28,7 +29,7 @@ export async function getCalendarConnections() {
         updatedAt: calendarConnections.updatedAt,
       })
       .from(calendarConnections)
-      .where(eq(calendarConnections.userId, userId))
+      .where(and(eq(calendarConnections.userId, userId), eq(calendarConnections.provider, 'outlook')))
       .orderBy(desc(calendarConnections.createdAt));
 
     return connections || [];
@@ -36,6 +37,36 @@ export async function getCalendarConnections() {
     console.error('[getCalendarConnections Error]:', err?.message);
     return [];
   }
+}
+
+export async function fetchConnectionCalendars(connectionId: string) {
+  const { userId } = await auth();
+  if (!userId) throw new Error('AUTH_EXPIRED');
+
+  return calendarService.fetchUserCalendars(userId, connectionId);
+}
+
+export async function updateSelectedCalendar(connectionId: string, calendarId: string) {
+  const { userId } = await auth();
+  if (!userId) throw new Error('AUTH_EXPIRED');
+
+  await ensureCalendarTablesExist();
+  const timestamp = new Date();
+
+  await db
+    .update(calendarConnections)
+    .set({
+      calendarId,
+      updatedAt: timestamp,
+    })
+    .where(
+      and(
+        eq(calendarConnections.id, connectionId),
+        eq(calendarConnections.userId, userId)
+      )
+    );
+
+  return { success: true };
 }
 
 export async function disconnectCalendar(connectionId: string) {

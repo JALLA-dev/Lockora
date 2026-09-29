@@ -20,7 +20,7 @@ export function MeetingTypeForm({ initialTypes }: { initialTypes: MeetingType[] 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [durationMinutes, setDurationMinutes] = useState(30);
-  const [locationType, setLocationType] = useState<'google_meet' | 'teams' | 'custom'>('google_meet');
+  const [locationType, setLocationType] = useState<'teams' | 'custom'>('teams');
   const [loading, setLoading] = useState(false);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
 
@@ -182,7 +182,6 @@ export function MeetingTypeForm({ initialTypes }: { initialTypes: MeetingType[] 
                     onChange={(e) => setLocationType(e.target.value as any)}
                     className="w-full text-xs rounded-md border border-zinc-300 dark:border-zinc-700 bg-white dark:bg-zinc-950 px-3 py-2 text-zinc-900 dark:text-white"
                   >
-                    <option value="google_meet">Google Meet</option>
                     <option value="teams">Microsoft Teams</option>
                     <option value="custom">Custom URL</option>
                   </select>

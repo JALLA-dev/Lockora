@@ -1,40 +1,40 @@
-import { GoogleCalendarProvider } from '../src/lib/calendar/providers/GoogleCalendarProvider';
 import { OutlookCalendarProvider } from '../src/lib/calendar/providers/OutlookCalendarProvider';
 
-describe('Calendar Provider Abstractions', () => {
-  it('GoogleCalendarProvider generates proper auth URL with state', () => {
-    const provider = new GoogleCalendarProvider();
-    const url = provider.getAuthUrl('mock-state-123', 'http://localhost:3000/api/calendar/google/callback');
+describe('Outlook Calendar Provider Abstraction', () => {
+  const originalEnv = process.env;
 
-    expect(url).toContain('accounts.google.com');
-    expect(url).toContain('state=mock-state-123');
-    expect(url).toContain('response_type=code');
+  beforeEach(() => {
+    process.env = {
+      ...originalEnv,
+      MICROSOFT_CLIENT_ID: 'test-client-id-123',
+      MICROSOFT_CLIENT_SECRET: 'test-client-secret-456',
+      MICROSOFT_TENANT_ID: 'common',
+    };
   });
 
-  it('OutlookCalendarProvider generates proper auth URL with state', () => {
+  afterAll(() => {
+    process.env = originalEnv;
+  });
+
+  it('OutlookCalendarProvider generates proper Microsoft Graph OAuth URL with state', () => {
     const provider = new OutlookCalendarProvider();
+    expect(provider.isConfigured()).toBe(true);
+
     const url = provider.getAuthUrl('mock-state-456', 'http://localhost:3000/api/calendar/outlook/callback');
 
-    expect(url).toContain('login.microsoftonline.com');
+    expect(url).toContain('login.microsoftonline.com/common/oauth2/v2.0/authorize');
+    expect(url).toContain('client_id=test-client-id-123');
     expect(url).toContain('state=mock-state-456');
     expect(url).toContain('response_type=code');
+    expect(url).toContain('Calendars.ReadWrite');
   });
 
-  it('GoogleCalendarProvider mock exchange code works cleanly', async () => {
-    const provider = new GoogleCalendarProvider();
-    const tokens = await provider.exchangeCode('mock-code-789', 'http://localhost/callback');
+  it('OutlookCalendarProvider reports not configured when client_id is missing', () => {
+    delete process.env.MICROSOFT_CLIENT_ID;
+    delete process.env.AZURE_OUTLOOK_CLIENT_ID;
 
-    expect(tokens.accessToken).toBeDefined();
-    expect(tokens.refreshToken).toBeDefined();
-    expect(tokens.providerAccountId).toBeDefined();
-  });
-
-  it('OutlookCalendarProvider mock exchange code works cleanly', async () => {
     const provider = new OutlookCalendarProvider();
-    const tokens = await provider.exchangeCode('mock-code-012', 'http://localhost/callback');
-
-    expect(tokens.accessToken).toBeDefined();
-    expect(tokens.refreshToken).toBeDefined();
-    expect(tokens.providerAccountId).toBeDefined();
+    expect(provider.isConfigured()).toBe(false);
+    expect(() => provider.getAuthUrl('state')).toThrow('CONFIG_ERROR');
   });
 });

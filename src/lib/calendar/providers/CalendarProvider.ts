@@ -1,19 +1,24 @@
 import {
   CalendarEventData,
   CalendarEventResult,
+  CalendarInfo,
   FreeBusySlot,
   TokenExchangeResult,
   TokenRefreshResult,
 } from '../types';
 
 export interface CalendarProvider {
-  readonly providerName: 'google' | 'outlook';
+  readonly providerName: 'outlook';
 
-  getAuthUrl(state: string, redirectUri: string): string;
+  isConfigured(): boolean;
 
-  exchangeCode(code: string, redirectUri: string): Promise<TokenExchangeResult>;
+  getAuthUrl(state: string, redirectUri?: string): string;
+
+  exchangeCode(code: string, redirectUri?: string): Promise<TokenExchangeResult>;
 
   refreshAccessToken(refreshToken: string): Promise<TokenRefreshResult>;
+
+  getCalendars(accessToken: string): Promise<CalendarInfo[]>;
 
   getFreeBusy(
     accessToken: string,

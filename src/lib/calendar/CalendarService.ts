@@ -1,33 +1,26 @@
 import { CalendarProvider } from './providers/CalendarProvider';
-import { GoogleCalendarProvider } from './providers/GoogleCalendarProvider';
 import { OutlookCalendarProvider } from './providers/OutlookCalendarProvider';
-import { CalendarEventData, CalendarEventResult, FreeBusySlot } from './types';
+import { CalendarEventData, CalendarEventResult, CalendarInfo, FreeBusySlot } from './types';
 import { db } from '@/db';
 import { calendarConnections } from '@/db/schema';
 import { eq, and } from 'drizzle-orm';
 import { decryptToken, encryptToken } from './crypto';
 
 export class CalendarService {
-  private providers: Map<string, CalendarProvider> = new Map();
+  private outlookProvider: OutlookCalendarProvider;
 
   constructor() {
-    const google = new GoogleCalendarProvider();
-    const outlook = new OutlookCalendarProvider();
-    this.providers.set(google.providerName, google);
-    this.providers.set(outlook.providerName, outlook);
+    this.outlookProvider = new OutlookCalendarProvider();
   }
 
-  getProvider(providerName: 'google' | 'outlook'): CalendarProvider {
-    const provider = this.providers.get(providerName);
-    if (!provider) {
-      throw new Error(`Unsupported calendar provider: ${providerName}`);
-    }
-    return provider;
+  getProvider(): OutlookCalendarProvider {
+    return this.outlookProvider;
   }
 
-  /**
-   * Retrieves an active connection for a user and automatically refreshes token if expired.
-   */
+  isConfigured(): boolean {
+    return this.outlookProvider.isConfigured();
+  }
+
   async getValidConnection(userId: string, connectionId?: string) {
     let connection;
     if (connectionId) {
@@ -38,6 +31,7 @@ export class CalendarService {
           and(
             eq(calendarConnections.id, connectionId),
             eq(calendarConnections.userId, userId),
+            eq(calendarConnections.provider, 'outlook'),
             eq(calendarConnections.status, 'ACTIVE')
           )
         );
@@ -49,6 +43,7 @@ export class CalendarService {
         .where(
           and(
             eq(calendarConnections.userId, userId),
+            eq(calendarConnections.provider, 'outlook'),
             eq(calendarConnections.status, 'ACTIVE')
           )
         );
@@ -59,10 +54,9 @@ export class CalendarService {
       return null;
     }
 
-    const provider = this.getProvider(connection.provider as 'google' | 'outlook');
+    const provider = this.getProvider();
     const now = new Date();
 
-    // Check if access token is expired (or about to expire within 2 minutes)
     if (connection.tokenExpiresAt.getTime() - now.getTime() < 120 * 1000) {
       try {
         const decryptedRefresh = decryptToken(connection.encryptedRefreshToken);
@@ -87,7 +81,7 @@ export class CalendarService {
         connection.encryptedAccessToken = newEncryptedAccess;
         connection.tokenExpiresAt = refreshResult.expiresAt;
       } catch (err: any) {
-        console.error(`Failed to auto-refresh calendar token for connection ${connection.id}:`, err?.message);
+        console.error(`Failed to auto-refresh Outlook token for connection ${connection.id}:`, err?.message);
         await db
           .update(calendarConnections)
           .set({ status: 'EXPIRED', updatedAt: new Date() })
@@ -102,6 +96,13 @@ export class CalendarService {
       provider,
       accessToken: decryptedAccessToken,
     };
+  }
+
+  async fetchUserCalendars(userId: string, connectionId: string): Promise<CalendarInfo[]> {
+    const validConn = await this.getValidConnection(userId, connectionId);
+    if (!validConn) return [];
+
+    return validConn.provider.getCalendars(validConn.accessToken);
   }
 
   async fetchFreeBusy(

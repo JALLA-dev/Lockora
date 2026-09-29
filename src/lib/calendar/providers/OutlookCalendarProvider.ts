@@ -2,6 +2,7 @@ import { CalendarProvider } from './CalendarProvider';
 import {
   CalendarEventData,
   CalendarEventResult,
+  CalendarInfo,
   FreeBusySlot,
   TokenExchangeResult,
   TokenRefreshResult,
@@ -10,16 +11,44 @@ import {
 export class OutlookCalendarProvider implements CalendarProvider {
   readonly providerName = 'outlook' as const;
 
-  private getClientId(): string {
-    return process.env.AZURE_OUTLOOK_CLIENT_ID || process.env.NEXT_PUBLIC_AZURE_CLIENT_ID || 'mock-outlook-client-id';
+  private getClientId(): string | null {
+    return (
+      process.env.MICROSOFT_CLIENT_ID ||
+      process.env.AZURE_OUTLOOK_CLIENT_ID ||
+      null
+    );
   }
 
-  private getClientSecret(): string {
-    return process.env.AZURE_OUTLOOK_CLIENT_SECRET || 'mock-outlook-client-secret';
+  private getClientSecret(): string | null {
+    return (
+      process.env.MICROSOFT_CLIENT_SECRET ||
+      process.env.AZURE_OUTLOOK_CLIENT_SECRET ||
+      null
+    );
   }
 
-  getAuthUrl(state: string, redirectUri: string): string {
+  private getTenantId(): string {
+    return process.env.MICROSOFT_TENANT_ID || process.env.AZURE_TENANT_ID || 'common';
+  }
+
+  isConfigured(): boolean {
     const clientId = this.getClientId();
+    const clientSecret = this.getClientSecret();
+    return Boolean(clientId && clientSecret);
+  }
+
+  getAuthUrl(state: string, redirectUri?: string): string {
+    const clientId = this.getClientId();
+    if (!clientId) {
+      throw new Error('CONFIG_ERROR');
+    }
+
+    const tenantId = this.getTenantId();
+    const callbackUri =
+      redirectUri ||
+      process.env.MICROSOFT_REDIRECT_URI ||
+      'http://localhost:3000/api/calendar/outlook/callback';
+
     const scopes = [
       'https://graph.microsoft.com/Calendars.ReadWrite',
       'https://graph.microsoft.com/User.Read',
@@ -29,47 +58,50 @@ export class OutlookCalendarProvider implements CalendarProvider {
     const params = new URLSearchParams({
       client_id: clientId,
       response_type: 'code',
-      redirect_uri: redirectUri,
+      redirect_uri: callbackUri,
       scope: scopes,
       response_mode: 'query',
       state,
     });
 
-    return `https://login.microsoftonline.com/common/oauth2/v2.0/authorize?${params.toString()}`;
+    return `https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/authorize?${params.toString()}`;
   }
 
-  async exchangeCode(code: string, redirectUri: string): Promise<TokenExchangeResult> {
-    if (code.startsWith('mock-')) {
-      return {
-        accessToken: `mock-outlook-access-token-${Date.now()}`,
-        refreshToken: `mock-outlook-refresh-token-${Date.now()}`,
-        expiresAt: new Date(Date.now() + 3600 * 1000),
-        providerAccountId: 'mock-outlook-user@outlook.com',
-        scopes: ['Calendars.ReadWrite'],
-      };
+  async exchangeCode(code: string, redirectUri?: string): Promise<TokenExchangeResult> {
+    const clientId = this.getClientId();
+    const clientSecret = this.getClientSecret();
+    if (!clientId || !clientSecret) {
+      throw new Error('CONFIG_ERROR');
     }
 
-    const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    const tenantId = this.getTenantId();
+    const callbackUri =
+      redirectUri ||
+      process.env.MICROSOFT_REDIRECT_URI ||
+      'http://localhost:3000/api/calendar/outlook/callback';
+
+    const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: this.getClientId(),
-        client_secret: this.getClientSecret(),
+        client_id: clientId,
+        client_secret: clientSecret,
         code,
         grant_type: 'authorization_code',
-        redirect_uri: redirectUri,
+        redirect_uri: callbackUri,
       }),
     });
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Microsoft Outlook OAuth token exchange failed: ${errText}`);
+      console.error('[Microsoft Graph Token Exchange Failed]:', errText);
+      throw new Error('PROVIDER_UNAVAILABLE');
     }
 
     const data = await response.json();
     const expiresAt = new Date(Date.now() + (data.expires_in || 3600) * 1000);
 
-    let providerAccountId = 'primary';
+    let providerAccountId = 'me';
     try {
       const meRes = await fetch('https://graph.microsoft.com/v1.0/me', {
         headers: { Authorization: `Bearer ${data.access_token}` },
@@ -94,19 +126,20 @@ export class OutlookCalendarProvider implements CalendarProvider {
   }
 
   async refreshAccessToken(refreshToken: string): Promise<TokenRefreshResult> {
-    if (refreshToken.startsWith('mock-')) {
-      return {
-        accessToken: `mock-outlook-access-token-refreshed-${Date.now()}`,
-        expiresAt: new Date(Date.now() + 3600 * 1000),
-      };
+    const clientId = this.getClientId();
+    const clientSecret = this.getClientSecret();
+    if (!clientId || !clientSecret) {
+      throw new Error('CONFIG_ERROR');
     }
 
-    const response = await fetch('https://login.microsoftonline.com/common/oauth2/v2.0/token', {
+    const tenantId = this.getTenantId();
+
+    const response = await fetch(`https://login.microsoftonline.com/${tenantId}/oauth2/v2.0/token`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: this.getClientId(),
-        client_secret: this.getClientSecret(),
+        client_id: clientId,
+        client_secret: clientSecret,
         refresh_token: refreshToken,
         grant_type: 'refresh_token',
       }),
@@ -114,7 +147,8 @@ export class OutlookCalendarProvider implements CalendarProvider {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Microsoft Outlook token refresh failed: ${errText}`);
+      console.error('[Microsoft Graph Token Refresh Failed]:', errText);
+      throw new Error('PROVIDER_UNAVAILABLE');
     }
 
     const data = await response.json();
@@ -125,15 +159,38 @@ export class OutlookCalendarProvider implements CalendarProvider {
     };
   }
 
+  async getCalendars(accessToken: string): Promise<CalendarInfo[]> {
+    const response = await fetch('https://graph.microsoft.com/v1.0/me/calendars', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+    });
+
+    if (!response.ok) {
+      console.error('[Microsoft Graph getCalendars Failed]:', await response.text());
+      return [{ id: 'primary', name: 'Primary Calendar', isPrimary: true, canEdit: true }];
+    }
+
+    const data = await response.json();
+    const calendarsList = data.value || [];
+
+    if (calendarsList.length === 0) {
+      return [{ id: 'primary', name: 'Primary Calendar', isPrimary: true, canEdit: true }];
+    }
+
+    return calendarsList.map((cal: any) => ({
+      id: cal.id,
+      name: cal.name || 'Outlook Calendar',
+      isPrimary: Boolean(cal.isDefaultCalendar),
+      canEdit: Boolean(cal.canEdit),
+    }));
+  }
+
   async getFreeBusy(
     accessToken: string,
     calendarId: string,
     startTime: Date,
     endTime: Date
   ): Promise<FreeBusySlot[]> {
-    if (accessToken.startsWith('mock-')) {
-      return [];
-    }
+    const targetSchedule = calendarId && calendarId !== 'primary' ? calendarId : 'me';
 
     const response = await fetch('https://graph.microsoft.com/v1.0/me/calendar/getSchedule', {
       method: 'POST',
@@ -142,7 +199,7 @@ export class OutlookCalendarProvider implements CalendarProvider {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        schedules: [calendarId || 'me'],
+        schedules: [targetSchedule],
         startTime: { dateTime: startTime.toISOString(), timeZone: 'UTC' },
         endTime: { dateTime: endTime.toISOString(), timeZone: 'UTC' },
         availabilityViewInterval: 15,
@@ -150,8 +207,8 @@ export class OutlookCalendarProvider implements CalendarProvider {
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Microsoft Graph getSchedule query failed: ${errText}`);
+      console.error('[Microsoft Graph getSchedule Failed]:', await response.text());
+      return [];
     }
 
     const data = await response.json();
@@ -169,14 +226,6 @@ export class OutlookCalendarProvider implements CalendarProvider {
     calendarId: string,
     event: CalendarEventData
   ): Promise<CalendarEventResult> {
-    if (accessToken.startsWith('mock-')) {
-      const mockEventId = `mock-outlook-event-${Date.now()}`;
-      return {
-        eventId: mockEventId,
-        meetingUrl: 'https://teams.microsoft.com/l/meetup-join/mock-lockora-teams',
-      };
-    }
-
     const body: any = {
       subject: event.title,
       body: {
@@ -214,7 +263,8 @@ export class OutlookCalendarProvider implements CalendarProvider {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Microsoft Graph create event failed: ${errText}`);
+      console.error('[Microsoft Graph createEvent Failed]:', errText);
+      throw new Error('PROVIDER_UNAVAILABLE');
     }
 
     const data = await response.json();
@@ -232,10 +282,6 @@ export class OutlookCalendarProvider implements CalendarProvider {
     calendarId: string,
     eventId: string
   ): Promise<boolean> {
-    if (accessToken.startsWith('mock-')) {
-      return true;
-    }
-
     const response = await fetch(`https://graph.microsoft.com/v1.0/me/events/${eventId}`, {
       method: 'DELETE',
       headers: { Authorization: `Bearer ${accessToken}` },
@@ -251,10 +297,6 @@ export class OutlookCalendarProvider implements CalendarProvider {
     newStart: Date,
     newEnd: Date
   ): Promise<boolean> {
-    if (accessToken.startsWith('mock-')) {
-      return true;
-    }
-
     const response = await fetch(`https://graph.microsoft.com/v1.0/me/events/${eventId}`, {
       method: 'PATCH',
       headers: {

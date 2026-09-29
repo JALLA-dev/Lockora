@@ -1,4 +1,11 @@
-export type CalendarProviderType = 'google' | 'outlook';
+export type CalendarProviderType = 'outlook';
+
+export interface CalendarInfo {
+  id: string;
+  name: string;
+  isPrimary: boolean;
+  canEdit: boolean;
+}
 
 export interface CalendarEventData {
   title: string;
@@ -7,7 +14,7 @@ export interface CalendarEventData {
   endTime: Date;
   attendeeEmail: string;
   attendeeName: string;
-  locationType?: 'google_meet' | 'teams' | 'custom';
+  locationType?: 'teams' | 'custom';
   locationUrl?: string;
 }
 
