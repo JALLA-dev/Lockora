@@ -21,9 +21,8 @@ export default async function PublicBookingPage({
         </div>
       </header>
 
-      {/* Main Content */}
       <main className="my-auto py-8 relative z-10">
-        <PublicBookingWidget slug={slug} />
+        <PublicBookingWidget username={username} slug={slug} />
       </main>
 
       {/* Footer */}

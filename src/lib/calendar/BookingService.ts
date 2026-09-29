@@ -1,5 +1,5 @@
 import { db } from '@/db';
-import { bookings, bookingEvents, meetingTypes, availabilityRules, auditLogs } from '@/db/schema';
+import { bookings, bookingEvents, meetingTypes, availabilitySchedules, auditLogs, users } from '@/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import crypto from 'crypto';
 import { calendarService } from './CalendarService';
@@ -12,6 +12,7 @@ export class BookingService {
    * Creates a new booking with authoritative pre-commit availability re-check (Race condition protection).
    */
   static async createBooking(params: {
+    username: string;
     slug: string;
     visitorName: string;
     visitorEmail: string;
@@ -19,38 +20,67 @@ export class BookingService {
     startTimeIso: string;
     visitorTimeZone?: string;
   }) {
-    const { slug, visitorName, visitorEmail, visitorNotes, startTimeIso } = params;
+    const { username, slug, visitorName, visitorEmail, visitorNotes, startTimeIso } = params;
 
-    // 1. Fetch meeting type & owner
+    // 1. Fetch user by username
+    const [user] = await db
+      .select()
+      .from(users)
+      .where(eq(users.username, username));
+
+    if (!user) {
+      throw new Error('User not found.');
+    }
+    const userId = user.id;
+
+    // 1b. Fetch meeting type
     const mtResults = await db
       .select()
       .from(meetingTypes)
-      .where(and(eq(meetingTypes.slug, slug), eq(meetingTypes.isActive, true)));
+      .where(
+        and(
+          eq(meetingTypes.userId, userId),
+          eq(meetingTypes.slug, slug),
+          eq(meetingTypes.isActive, true)
+        )
+      );
 
     const meetingType = mtResults[0];
     if (!meetingType) {
       throw new Error('Meeting type not found or inactive.');
     }
 
-    const userId = meetingType.userId;
     const startTime = new Date(startTimeIso);
     const endTime = new Date(startTime.getTime() + meetingType.durationMinutes * 60 * 1000);
 
-    // 2. Fetch User Availability Rules
-    const availResults = await db
-      .select()
-      .from(availabilityRules)
-      .where(eq(availabilityRules.userId, userId));
+    // 2. Fetch User Availability Schedule
+    let schedule: any;
+    if (meetingType.scheduleId) {
+      const [found] = await db
+        .select()
+        .from(availabilitySchedules)
+        .where(eq(availabilitySchedules.id, meetingType.scheduleId));
+      schedule = found;
+    } 
+    
+    if (!schedule) {
+      // Fallback to default schedule
+      const defaultSchedules = await db
+        .select()
+        .from(availabilitySchedules)
+        .where(and(eq(availabilitySchedules.userId, userId), eq(availabilitySchedules.isDefault, true)));
+      schedule = defaultSchedules[0];
+    }
 
-    const userRules: AvailabilitySettings = availResults[0]
+    const userRules: AvailabilitySettings = schedule
       ? {
-          id: availResults[0].id,
-          userId: availResults[0].userId,
-          timeZone: availResults[0].timeZone,
-          weeklyHours: availResults[0].weeklyHours as any,
-          bufferMinutes: availResults[0].bufferMinutes,
-          minNoticeMinutes: availResults[0].minNoticeMinutes,
-          maxBookingDays: availResults[0].maxBookingDays,
+          id: schedule.id,
+          userId: schedule.userId,
+          timeZone: schedule.timeZone,
+          weeklyHours: schedule.weeklyHours as any,
+          bufferMinutes: Math.max(meetingType.bufferBefore || 0, meetingType.bufferAfter || 0),
+          minNoticeMinutes: meetingType.minNoticeMinutes || 120,
+          maxBookingDays: meetingType.maxBookingDays || 30,
         }
       : {
           userId,
@@ -61,10 +91,12 @@ export class BookingService {
             wed: [{ start: '09:00', end: '17:00' }],
             thu: [{ start: '09:00', end: '17:00' }],
             fri: [{ start: '09:00', end: '17:00' }],
+            sat: [],
+            sun: [],
           },
-          bufferMinutes: 15,
-          minNoticeMinutes: 120,
-          maxBookingDays: 30,
+          bufferMinutes: Math.max(meetingType.bufferBefore || 0, meetingType.bufferAfter || 0),
+          minNoticeMinutes: meetingType.minNoticeMinutes || 120,
+          maxBookingDays: meetingType.maxBookingDays || 30,
         };
 
     // 3. Authoritative DB Double-Booking Check (Race Condition Protection)

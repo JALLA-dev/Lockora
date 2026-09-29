@@ -12,9 +12,10 @@ import Link from 'next/link';
 interface MeetingTypeEditorProps {
   initialData?: any;
   schedules?: any[];
+  username?: string;
 }
 
-export function MeetingTypeEditor({ initialData, schedules = [] }: MeetingTypeEditorProps) {
+export function MeetingTypeEditor({ initialData, schedules = [], username = 'you' }: MeetingTypeEditorProps) {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [activeSection, setActiveSection] = useState('basic');
@@ -412,7 +413,7 @@ export function MeetingTypeEditor({ initialData, schedules = [] }: MeetingTypeEd
                   <label className="block text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-1">Event URL Slug</label>
                   <div className="flex rounded-lg shadow-sm">
                     <span className="inline-flex items-center px-4 rounded-l-lg border border-r-0 border-zinc-300 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-900 text-zinc-500 text-sm">
-                      lockora.com/book/you/
+                      lockora.com/book/{username}/
                     </span>
                     <input
                       type="text"

@@ -1,17 +1,18 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/db';
-import { meetingTypes, availabilityRules, bookings } from '@/db/schema';
+import { availabilitySchedules, bookings } from '@/db/schema';
 import { eq, and, gte, lte } from 'drizzle-orm';
 import { AvailabilityService } from '@/lib/calendar/AvailabilityService';
 import { calendarService } from '@/lib/calendar/CalendarService';
 import { TimeZoneService } from '@/lib/calendar/TimeZoneService';
+import { getPublicEventType } from '@/app/actions/public-booking';
 
 export async function GET(
   request: Request,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ username: string; slug: string }> }
 ) {
   try {
-    const { slug } = await params;
+    const { username, slug } = await params;
     const url = new URL(request.url);
     const dateStr = url.searchParams.get('date'); // "YYYY-MM-DD"
     const visitorTimeZone = url.searchParams.get('tz') || 'UTC';
@@ -23,34 +24,44 @@ export async function GET(
       );
     }
 
-    // 1. Fetch meeting type
-    const mtResults = await db
-      .select()
-      .from(meetingTypes)
-      .where(and(eq(meetingTypes.slug, slug), eq(meetingTypes.isActive, true)));
-
-    const meetingType = mtResults[0];
-    if (!meetingType) {
+    // 1. Fetch meeting type via username and slug
+    const profile = await getPublicEventType(username, slug);
+    if (!profile) {
       return NextResponse.json({ error: 'Booking page not found or inactive.' }, { status: 404 });
     }
 
-    const userId = meetingType.userId;
+    const { user, eventType: meetingType } = profile;
+    const userId = user.id;
 
-    // 2. Fetch Availability Rules
-    const availResults = await db
-      .select()
-      .from(availabilityRules)
-      .where(eq(availabilityRules.userId, userId));
+    // 2. Fetch Availability Schedule
+    let schedule: any;
+    if (meetingType.scheduleId) {
+      const [found] = await db
+        .select()
+        .from(availabilitySchedules)
+        .where(eq(availabilitySchedules.id, meetingType.scheduleId));
+      schedule = found;
+    } 
+    
+    if (!schedule) {
+      // Fallback to default schedule
+      const defaultSchedules = await db
+        .select()
+        .from(availabilitySchedules)
+        .where(and(eq(availabilitySchedules.userId, userId), eq(availabilitySchedules.isDefault, true)));
+      schedule = defaultSchedules[0];
+    }
 
-    const userRules = availResults[0]
+    const userRules = schedule
       ? {
-          id: availResults[0].id,
-          userId: availResults[0].userId,
-          timeZone: availResults[0].timeZone,
-          weeklyHours: availResults[0].weeklyHours as any,
-          bufferMinutes: availResults[0].bufferMinutes,
-          minNoticeMinutes: availResults[0].minNoticeMinutes,
-          maxBookingDays: availResults[0].maxBookingDays,
+          id: schedule.id,
+          userId: schedule.userId,
+          timeZone: schedule.timeZone,
+          weeklyHours: schedule.weeklyHours as any,
+          // Map the new granular limits from meetingType rather than schedule
+          bufferMinutes: Math.max(meetingType.bufferBefore || 0, meetingType.bufferAfter || 0),
+          minNoticeMinutes: meetingType.minNoticeMinutes || 120,
+          maxBookingDays: meetingType.maxBookingDays || 30,
         }
       : {
           userId,
@@ -64,9 +75,9 @@ export async function GET(
             sat: [],
             sun: [],
           },
-          bufferMinutes: 15,
-          minNoticeMinutes: 120,
-          maxBookingDays: 30,
+          bufferMinutes: Math.max(meetingType.bufferBefore || 0, meetingType.bufferAfter || 0),
+          minNoticeMinutes: meetingType.minNoticeMinutes || 120,
+          maxBookingDays: meetingType.maxBookingDays || 30,
         };
 
     // 3. Compute target day UTC boundaries

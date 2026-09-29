@@ -10,7 +10,7 @@ interface AvailableSlot {
   timeZone: string;
 }
 
-export function PublicBookingWidget({ slug }: { slug: string }) {
+export function PublicBookingWidget({ username, slug }: { username: string; slug: string }) {
   const [selectedDate, setSelectedDate] = useState<string>(() => {
     const today = new Date();
     return today.toISOString().split('T')[0];
@@ -41,7 +41,7 @@ export function PublicBookingWidget({ slug }: { slug: string }) {
     }
   }, []);
 
-  // Fetch slots whenever selectedDate, visitorTimeZone, or slug changes
+  // Fetch slots whenever selectedDate, visitorTimeZone, username, or slug changes
   useEffect(() => {
     let active = true;
     async function fetchSlots() {
@@ -50,7 +50,7 @@ export function PublicBookingWidget({ slug }: { slug: string }) {
       setSelectedSlot(null);
       try {
         const res = await fetch(
-          `/api/calendar/public/${slug}/slots?date=${selectedDate}&tz=${encodeURIComponent(visitorTimeZone)}`
+          `/api/calendar/public/${username}/${slug}/slots?date=${selectedDate}&tz=${encodeURIComponent(visitorTimeZone)}`
         );
         const data = await res.json();
 
@@ -75,7 +75,7 @@ export function PublicBookingWidget({ slug }: { slug: string }) {
     return () => {
       active = false;
     };
-  }, [slug, selectedDate, visitorTimeZone]);
+  }, [username, slug, selectedDate, visitorTimeZone]);
 
   const handleBook = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -85,7 +85,7 @@ export function PublicBookingWidget({ slug }: { slug: string }) {
     setErrorMsg(null);
 
     try {
-      const res = await fetch(`/api/calendar/public/${slug}/book`, {
+      const res = await fetch(`/api/calendar/public/${username}/${slug}/book`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

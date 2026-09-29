@@ -3,10 +3,10 @@ import { BookingService } from '@/lib/calendar/BookingService';
 
 export async function POST(
   request: Request,
-  { params }: { params: Promise<{ slug: string }> }
+  { params }: { params: Promise<{ username: string; slug: string }> }
 ) {
   try {
-    const { slug } = await params;
+    const { username, slug } = await params;
     const body = await request.json();
 
     const { visitorName, visitorEmail, visitorNotes, startTimeIso, visitorTimeZone } = body;
@@ -19,6 +19,7 @@ export async function POST(
     }
 
     const bookingResult = await BookingService.createBooking({
+      username,
       slug,
       visitorName,
       visitorEmail,
