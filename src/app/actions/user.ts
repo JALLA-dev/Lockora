@@ -46,7 +46,7 @@ export async function updateUsername(username: string) {
     if (err.code === '23505') {
       return { error: 'This username is already taken. Please choose another one.' };
     }
-    console.error('[updateUsername] Error:', err?.message);
-    return { error: 'An unexpected error occurred while saving the username.' };
+    console.error('[updateUsername] Error:', err?.message, err);
+    return { error: `Server Error: ${err?.message || 'Unknown'}` };
   }
 }
