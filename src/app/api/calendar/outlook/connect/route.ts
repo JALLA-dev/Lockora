@@ -31,11 +31,14 @@ export async function GET(request: Request) {
   const redirectUri =
     process.env.MICROSOFT_REDIRECT_URI || `${url.origin}/api/calendar/outlook/callback`;
 
-  // Check provider is configured BEFORE generating state
-  const provider = new OutlookCalendarProvider();
-  if (!provider.isConfigured()) {
-    console.error('[Outlook Connect] Microsoft Entra app not configured. Check MICROSOFT_CLIENT_ID and MICROSOFT_CLIENT_SECRET env vars.');
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=config_error`);
+  // Diagnostic check
+  const hasClientId = Boolean(process.env.MICROSOFT_CLIENT_ID || process.env.AZURE_OUTLOOK_CLIENT_ID);
+  const hasClientSecret = Boolean(process.env.MICROSOFT_CLIENT_SECRET || process.env.AZURE_OUTLOOK_CLIENT_SECRET);
+  
+  if (!hasClientId || !hasClientSecret) {
+    console.error(`[Outlook Connect] Microsoft Entra app not configured. Diagnostic: CLIENT_ID_EXISTS=${hasClientId}, CLIENT_SECRET_EXISTS=${hasClientSecret}`);
+    const missingVar = !hasClientId ? 'client_id' : 'client_secret';
+    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=config_error&missing=${missingVar}`);
   }
 
   try {
