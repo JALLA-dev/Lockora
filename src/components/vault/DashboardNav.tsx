@@ -12,7 +12,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 
 const navItems = [
   { href: '/dashboard', label: 'My Lockora', icon: Shield },
-  { href: '/dashboard/calendar', label: 'Calendar', icon: Calendar },
+  { href: '/dashboard/scheduling', label: 'Scheduling', icon: Calendar },
+  { href: '/dashboard/availability', label: 'Availability', icon: Calendar },
   { href: '/dashboard/secrets/new', label: 'Add Secret', icon: PlusCircle },
   { href: '/dashboard/settings', label: 'Settings', icon: Settings },
   { href: '/dashboard/audit', label: 'Audit Logs', icon: FileText },

@@ -34,11 +34,11 @@ export async function GET(request: Request) {
   // Handle Microsoft returning an error (e.g. user declined consent)
   if (errorParam) {
     console.error(`[Outlook OAuth] Microsoft returned error: ${errorParam} — ${errorDesc}`);
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=consent_denied`);
+    return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=consent_denied`);
   }
 
   if (!code || !stateParam) {
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=missing_params`);
+    return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=missing_params`);
   }
 
   try {
@@ -59,7 +59,7 @@ export async function GET(request: Request) {
 
     if (!stateRecord) {
       console.error('[Outlook OAuth] State not found or wrong provider. Possible CSRF attack.');
-      return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=invalid_state`);
+      return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=invalid_state`);
     }
 
     // 2. Single-use: delete the state immediately to prevent replay attacks
@@ -68,7 +68,7 @@ export async function GET(request: Request) {
     // 3. Check expiry
     if (stateRecord.expiresAt.getTime() < Date.now()) {
       console.error('[Outlook OAuth] State expired.');
-      return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=state_expired`);
+      return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=state_expired`);
     }
 
     // 4. Get the userId from the stored state — NEVER trust a user-supplied userId
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
     const provider = new OutlookCalendarProvider();
     if (!provider.isConfigured()) {
       console.error('[Outlook OAuth Callback] Provider not configured.');
-      return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=config_error`);
+      return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=config_error`);
     }
 
     // 6. Exchange authorization code for tokens (server-side only — code never exposed)
@@ -140,9 +140,9 @@ export async function GET(request: Request) {
       timestamp,
     });
 
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?connected=microsoft`);
+    return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?connected=microsoft`);
   } catch (err: any) {
     console.error('[Outlook OAuth Callback Error]:', err?.message);
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=auth_failed`);
+    return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=auth_failed`);
   }
 }

@@ -26,7 +26,7 @@ export async function GET(request: Request) {
   if (!hasClientId || !hasClientSecret) {
     console.error(`[Google Connect] Google app not configured. Diagnostic: CLIENT_ID_EXISTS=${hasClientId}, CLIENT_SECRET_EXISTS=${hasClientSecret}`);
     const missingVar = !hasClientId ? 'client_id' : 'client_secret';
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=config_error&missing=${missingVar}`);
+    return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=config_error&missing=${missingVar}`);
   }
 
   try {
@@ -52,6 +52,6 @@ export async function GET(request: Request) {
   } catch (err: any) {
     console.error('[Google Connect Error]:', err?.message);
     const safeErrorMsg = encodeURIComponent(err?.message?.substring(0, 100) || 'unknown');
-    return NextResponse.redirect(`${url.origin}/dashboard/calendar?error=server_error&details=${safeErrorMsg}`);
+    return NextResponse.redirect(`${url.origin}/dashboard/settings/calendars?error=server_error&details=${safeErrorMsg}`);
   }
 }
