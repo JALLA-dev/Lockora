@@ -30,20 +30,16 @@ export default async function PublicProfilePage({
         {/* Profile Header */}
         <div className="flex flex-col items-center text-center space-y-4">
           <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-zinc-900 shadow-lg bg-indigo-100 dark:bg-indigo-900/50 flex items-center justify-center">
-            {user.imageUrl ? (
-              <Image src={user.imageUrl} alt={user.firstName || 'User'} width={96} height={96} className="object-cover" />
-            ) : (
-              <span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
-                {(user.firstName?.[0] || 'U').toUpperCase()}
-              </span>
-            )}
+            <span className="text-3xl font-bold text-indigo-600 dark:text-indigo-400">
+              {(user.username?.[0] || 'U').toUpperCase()}
+            </span>
           </div>
           <div>
             <h1 className="text-2xl md:text-3xl font-bold text-zinc-900 dark:text-white">
-              {user.firstName} {user.lastName}
+              @{user.username}
             </h1>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1 font-medium">
-              Schedule a meeting with {user.firstName || username}
+              Schedule a meeting with {user.username}
             </p>
           </div>
         </div>
