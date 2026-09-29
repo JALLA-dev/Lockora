@@ -187,6 +187,7 @@ export class BookingService {
       endTime,
       status: 'CONFIRMED',
       meetingUrl: meetingUrl || null,
+      secureToken: crypto.randomBytes(32).toString('hex'),
       createdAt: timestamp,
       updatedAt: timestamp,
     });

@@ -13,9 +13,6 @@ export async function getPublicProfile(username: string) {
     const [user] = await db
       .select({
         id: users.id,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        imageUrl: users.imageUrl,
         username: users.username,
       })
       .from(users)
@@ -53,9 +50,6 @@ export async function getPublicEventType(username: string, slug: string) {
     const [user] = await db
       .select({
         id: users.id,
-        firstName: users.firstName,
-        lastName: users.lastName,
-        imageUrl: users.imageUrl,
         username: users.username,
       })
       .from(users)
