@@ -103,8 +103,7 @@ export default async function CalendarBookingsPage({
               <div className="space-y-3">
                 <div className="flex items-start gap-3">
                   <div
-                    className="w-3 h-3 rounded-full mt-1.5 shrink-0"
-                    style={{ backgroundColor: b.meetingType.color || '#6366f1' }}
+                    className="w-3 h-3 rounded-full mt-1.5 shrink-0 bg-indigo-500"
                   />
                   <div>
                     <h3 className="font-semibold text-zinc-900 dark:text-white text-base">
